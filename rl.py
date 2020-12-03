@@ -5,7 +5,16 @@ from agents.hardcoded_agents import GoToGoodGoalAgent
 import numpy as np
 
 
-def value_iteration(env, agent, gamma=0.9, max_iters=1e4, max_tol=1e-4):
+def tabular_learning(env, agent, gamma, max_iters=1e4, max_tol=1e-4):
+    values_table = _value_iteration(env, agent, gamma, max_iters, max_tol)
+
+    value_function = _get_value_function(values_table)
+    q_function = _get_q_function(values_table, env)
+
+    return value_function, q_function
+
+
+def _value_iteration(env, agent, gamma=0.9, max_iters=1e4, max_tol=1e-4):
     values_t = get_initial_value_table(env)
     converged = False
     i = 0
@@ -13,6 +22,8 @@ def value_iteration(env, agent, gamma=0.9, max_iters=1e4, max_tol=1e-4):
     while not converged:
         delta = 0.0
         values_t_1 = values_t.copy()
+
+        q_func = _get_q_function(values_t, env)
         
         for state in values_t.keys():
             if state == env.good_goal_pos or state == env.bad_goal_pos:
@@ -21,13 +32,8 @@ def value_iteration(env, agent, gamma=0.9, max_iters=1e4, max_tol=1e-4):
             action_probs = agent.action_probs(obs)
             value = 0
             for action, prob in enumerate(action_probs):
-                env.reset()
-                env.env.env.agent_pos = state
-                obs_prime, reward, _, _ = env.step(action)
-                state_prime = encode(obs_prime)
-                if state == (env.good_goal_pos[0], env.good_goal_pos[1]-1) and action == env.Actions.down:
-                    assert state_prime == env.good_goal_pos
-                value += prob * (reward + gamma * values_t[state_prime])
+                q_val = q_func(obs, action)
+                value += prob * q_val
                  
             values_t_1[state] = value
             delta = max(delta, abs(values_t_1[state] - values_t[state]))
@@ -36,10 +42,22 @@ def value_iteration(env, agent, gamma=0.9, max_iters=1e4, max_tol=1e-4):
         values_t = values_t_1
         i += 1
 
-    def value_function(obs):
-        return values_t[encode(obs)]
+    return values_t
 
+def _get_value_function(values_table):
+    def value_function(obs):
+        return values_table[encode(obs)]
     return value_function
+
+def _get_q_function(values_table, env):
+    def q_function(obs, action):
+        state = encode(obs)
+        env.reset()
+        env.env.env.agent_pos = state
+        obs_prime, reward, _, _ = env.step(action)
+        state_prime = encode(obs_prime)
+        return reward + gamma * values_table[state_prime]
+    return q_function
 
 
 def encode(state):
@@ -81,7 +99,7 @@ if __name__ == '__main__':
 
     gamma = 0.9
 
-    v_pi = value_iteration(env, agent, gamma=gamma)
+    v_pi, q_pi = tabular_learning(env, agent, gamma=gamma)
 
     states = list(get_initial_value_table(env).keys())
     states.remove(env.good_goal_pos)
