@@ -29,7 +29,7 @@ class RandAgent(Agent):
         return self.action_space.sample()
 
     def action_probs(self, observation):
-        unif_prob = 1 / len(self.action_space)
+        unif_prob = 1 / self.action_space.n
         return np.ones() * unif_prob
 
 
@@ -48,7 +48,11 @@ class GoToGoodGoalAgent(Agent):
                     good_goal_pos = (i, j)
                 elif IDX_TO_OBJECT[obj_state[0]] == 'agent':
                     curr_pos = (i, j)
-        assert good_goal_pos and curr_pos
+
+        if not good_goal_pos or not curr_pos:
+            print(good_goal_pos)
+            print(curr_pos)
+            raise ValueError()
 
         agent_x, agent_y = curr_pos
         goal_x, goal_y = good_goal_pos
@@ -63,3 +67,9 @@ class GoToGoodGoalAgent(Agent):
             return MyMiniGridEnv.Actions.down
         else:
             return MyMiniGridEnv.Actions.stay
+
+    def action_probs(self, observation):
+        probs = np.zeros(self.action_space.n)
+        action = self.action(observation)
+        probs[action] = 1
+        return probs
