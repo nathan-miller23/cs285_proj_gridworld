@@ -177,8 +177,7 @@ def main():
     if args.strategic_advantage:
         env = load(args.env_path)
         agent = load(args.agent_path)
-        _, q_func = tabular_learning(env, agent, gamma=0.9)
-        A_strat = lambda s : max([q_func(s, a) for a in env.Actions]) - min([q_func(s, a) for a in env.Actions])
+        _, _, A_strat = tabular_learning(env, agent, gamma=0.9)
     
     train(model, X, Y, training_params, A_strat)
 

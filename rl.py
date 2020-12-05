@@ -5,13 +5,14 @@ from agents.hardcoded_agents import GoToGoodGoalAgent
 import numpy as np
 
 
-def tabular_learning(env, agent, gamma, max_iters=1e4, max_tol=1e-4):
+def tabular_learning(env, agent, gamma, max_iters=1e4, max_tol=1e-4, state_func=False):
     values_table = _value_iteration(env, agent, gamma, max_iters, max_tol)
 
-    value_function = _get_value_function(values_table)
-    q_function = _get_q_function(values_table, env, gamma)
+    value_function = _get_value_function(values_table, state_func)
+    q_function = _get_q_function(values_table, env, gamma, state_func)
+    A_strat_function = _get_a_strat_function(values_table, env, gamma, state_func)
 
-    return value_function, q_function
+    return value_function, q_function, A_strat_function
 
 
 def _value_iteration(env, agent, gamma=0.9, max_iters=1e4, max_tol=1e-4):
@@ -23,7 +24,7 @@ def _value_iteration(env, agent, gamma=0.9, max_iters=1e4, max_tol=1e-4):
         delta = 0.0
         values_t_1 = values_t.copy()
 
-        q_func = _get_q_function(values_t, env, gamma)
+        q_func = _get_q_function(values_t, env, gamma, state_func=False)
         
         for state in values_t.keys():
             if state == env.good_goal_pos or state == env.bad_goal_pos:
@@ -44,20 +45,31 @@ def _value_iteration(env, agent, gamma=0.9, max_iters=1e4, max_tol=1e-4):
 
     return values_t
 
-def _get_value_function(values_table):
-    def value_function(obs):
-        return values_table[encode(obs)]
-    return value_function
+def _get_value_function(values_table, state_func):
+    def value_function_state(state):
+        return values_table[state]
+    def value_function_obs(obs):
+        return value_function_state(encode(obs))
+    return value_function_state if state_func else value_function_obs
 
-def _get_q_function(values_table, env, gamma):
-    def q_function(obs, action):
-        state = encode(obs)
+def _get_q_function(values_table, env, gamma, state_func):
+    def q_function_state(state, action):
         env.reset()
         env.env.env.agent_pos = state
         obs_prime, reward, _, _ = env.step(action)
         state_prime = encode(obs_prime)
         return reward + gamma * values_table[state_prime]
-    return q_function
+    def q_function_obs(obs, action):
+        return q_function_state(encode(obs), action)
+    return q_function_state if state_func else q_function_obs
+
+def _get_a_strat_function(values_table, env, gamma, state_func):
+    q_function_state = _get_q_function(values_table, env, gamma, True)
+    def A_strat_state(s):
+        return max([q_function_state(s, a) for a in env.Actions]) - min([q_function_state(s, a) for a in env.Actions])
+    def A_strat_obs(obs):
+        return A_strat_state(encode(obs))
+    return A_strat_state if state_func else A_strat_obs
 
 
 def encode(state):
@@ -77,6 +89,21 @@ def get_initial_value_table(env):
             values[(i, j)] = 0
     values[env.good_goal_pos] = values[env.bad_goal_pos] = 0
     return values
+
+def get_value_table_from_obs(env, obs_func):
+    state_func = lambda state : obs_func(decode(state, env))
+    return get_value_table_from_states(env, state_func)
+
+
+def get_value_table_from_states(env, state_func):
+    states = list(get_initial_value_table(env).keys())
+    states.remove(env.good_goal_pos)
+    states.remove(env.bad_goal_pos)
+    mat = np.zeros((env.width, env.height))
+    for state in states:
+        val = state_func(state)
+        mat[state[0], state[1]] = val
+    return mat
 
 def _find_agent(state):
     for i in range(len(state)):
