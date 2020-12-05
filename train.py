@@ -6,6 +6,8 @@ import numpy as np
 
 from torch.utils.data import random_split, TensorDataset, DataLoader
 from torch import nn
+from rl import tabular_learning
+from generate_data import load
 
 CURR_DIR = os.path.abspath('.')
 
@@ -52,15 +54,25 @@ class Net(nn.Module):
     def forward(self, x):
         return self.net(x)
 
-def load_data(data_path):
+def load_data(data_path, dataset_size):
     with open(data_path, 'rb') as f:
         data_dict = pickle.load(f)
-    states = data_dict['states']
-    actions = data_dict['actions']
+    states = data_dict['states'][:dataset_size]
+    actions = data_dict['actions'][:dataset_size]
 
     return states, actions
 
-def train(model, X, Y, train_params):
+def strategic_advantage_weighted_cross_entropy(logits, labels, states, A_strat):
+    weights = []
+    for state in states:
+        weights.append(A_strat(state.numpy()))
+    weights = torch.tensor(weights)
+    logprobs = torch.gather(nn.LogSoftmax(1)(logits), 1, labels.unsqueeze(1))
+    losses = weights * logprobs
+    return torch.sum(losses) / torch.sum(weights)
+    
+
+def train(model, X, Y, train_params, A_strat):
     X = torch.Tensor(X)
     Y = torch.Tensor(Y)
     full_dataset = TensorDataset(X,Y)
@@ -79,16 +91,20 @@ def train(model, X, Y, train_params):
         train_loss = 0.0
         for i, data in tqdm.tqdm(enumerate(train_loader, 0)):
             # get the inputs; data is a list of [inputs, labels]
-            inputs, labels = data
+            states, labels = data
             labels = labels.type(torch.long)
-            inputs = inputs.permute(0, 3, 1, 2)
+            inputs = states.permute(0, 3, 1, 2)
 
             # zero the parameter gradients
             optimizer.zero_grad()
 
             # forward + backward + optimize
             outputs = model(inputs)
-            loss = criterion(outputs, labels)
+
+            if train_params['strategic_advantage']:
+                loss = strategic_advantage_weighted_cross_entropy(outputs, labels, states, A_strat)
+            else:
+                loss = criterion(outputs, labels)
             loss.backward()
             optimizer.step()
 
@@ -115,7 +131,9 @@ def train(model, X, Y, train_params):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--data_path", "-dp", type=str, default=os.path.join(CURR_DIR, 'out.pkl'))
+    parser.add_argument("--data_path", "-dp", type=str, default=os.path.join(CURR_DIR, 'data.pkl'))
+    parser.add_argument('--agent_path', '-ap', type=str, default=os.path.join(CURR_DIR, 'agent.pkl'))
+    parser.add_argument('--env_path', '-ep', type=str, default=os.path.join(CURR_DIR, 'env.pkl'))
     parser.add_argument('--fc_arch','-fc', nargs='+', type=int, default=[100])
     parser.add_argument('--conv_arch', '-cv', nargs='+', type=int, default=[8, 16])
     parser.add_argument('--num_epochs', '-e', type=int, default=100)
@@ -124,10 +142,13 @@ def main():
     parser.add_argument('--filter_size', '-fs', type=int, default=3)
     parser.add_argument('--stride', '-s', type=int, default=2)
     parser.add_argument('--train_size', '-ts', type=float, default=0.8)
+    parser.add_argument('--dataset_size', '-n', type=int, default=1000)
+    parser.add_argument('--strategic_advantage', '-adv', action='store_true')
+    parser.add_argument('--online_q_learning', '-on', action="store_true")
 
     args = parser.parse_args()
 
-    X, Y = load_data(args.data_path)
+    X, Y = load_data(args.data_path, args.dataset_size)
     
     in_shape = X[0].shape
     out_size = len(np.unique(Y))
@@ -145,12 +166,21 @@ def main():
         "lr" : args.learning_rate,
         "batch_size" : args.batch_size,
         "num_epochs" : args.num_epochs,
-        "train_size" : args.train_size
+        "train_size" : args.train_size,
+        "strategic_advantage" : args.strategic_advantage
     }
 
     model = Net(**model_params)
+
+    A_strat = None
+
+    if args.strategic_advantage:
+        env = load(args.env_path)
+        agent = load(args.agent_path)
+        _, q_func = tabular_learning(env, agent, gamma=0.9)
+        A_strat = lambda s : max([q_func(s, a) for a in env.Actions]) - min([q_func(s, a) for a in env.Actions])
     
-    train(model, X, Y, training_params)
+    train(model, X, Y, training_params, A_strat)
 
 if __name__ == '__main__':
     main()

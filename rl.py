@@ -9,7 +9,7 @@ def tabular_learning(env, agent, gamma, max_iters=1e4, max_tol=1e-4):
     values_table = _value_iteration(env, agent, gamma, max_iters, max_tol)
 
     value_function = _get_value_function(values_table)
-    q_function = _get_q_function(values_table, env)
+    q_function = _get_q_function(values_table, env, gamma)
 
     return value_function, q_function
 
@@ -23,7 +23,7 @@ def _value_iteration(env, agent, gamma=0.9, max_iters=1e4, max_tol=1e-4):
         delta = 0.0
         values_t_1 = values_t.copy()
 
-        q_func = _get_q_function(values_t, env)
+        q_func = _get_q_function(values_t, env, gamma)
         
         for state in values_t.keys():
             if state == env.good_goal_pos or state == env.bad_goal_pos:
@@ -49,7 +49,7 @@ def _get_value_function(values_table):
         return values_table[encode(obs)]
     return value_function
 
-def _get_q_function(values_table, env):
+def _get_q_function(values_table, env, gamma):
     def q_function(obs, action):
         state = encode(obs)
         env.reset()
@@ -83,7 +83,7 @@ def _find_agent(state):
         for j in range(state.shape[1]):
             encoding = state[i, j, :]
             if IDX_TO_OBJECT[encoding[0]] == 'agent':
-                return (i, j), encoding
+                return (i, j), encoding.copy()
 
     raise ValueError("Agent not found!")
 
