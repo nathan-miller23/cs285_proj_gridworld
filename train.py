@@ -54,6 +54,10 @@ class Net(nn.Module):
     def forward(self, x):
         return self.net(x)
 
+def set_seed(seed):
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+
 def load_data(data_path, dataset_size):
     with open(data_path, 'rb') as f:
         data_dict = pickle.load(f)
@@ -129,7 +133,42 @@ def train(model, X, Y, train_params, A_strat):
         print("")
 
 
-def main():
+def main(params):
+    set_seed(params['seed'])
+    X, Y = load_data(params['data_path'], params['dataset_size'])
+    
+    in_shape = X[0].shape
+    out_size = len(np.unique(Y))
+
+    model_params = {
+        "fc_arch" : params['fc_arch'],
+        "conv_arch" : params['conv_arch'],
+        "filter_size" : params['filter_size'],
+        "stride" : params['stride'],
+        "in_shape" : in_shape,
+        "out_size" : out_size
+    }
+
+    training_params = {
+        "lr" : params['learning_rate'],
+        "batch_size" : params['batch_size'],
+        "num_epochs" : params['num_epochs'],
+        "train_size" : params['train_size'],
+        "strategic_advantage" : params['strategic_advantage']
+    }
+
+    model = Net(**model_params)
+
+    A_strat = None
+
+    if params['strategic_advantage']:
+        env = load(params['env_path'])
+        agent = load(params['agent_path'])
+        _, _, A_strat = tabular_learning(env, agent, gamma=0.9)
+    
+    train(model, X, Y, training_params, A_strat)
+
+if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("--data_path", "-dp", type=str, default=os.path.join(CURR_DIR, 'data.pkl'))
     parser.add_argument('--agent_path', '-ap', type=str, default=os.path.join(CURR_DIR, 'agent.pkl'))
@@ -140,47 +179,13 @@ def main():
     parser.add_argument('--batch_size', '-b', type=int, default=2000)
     parser.add_argument('--learning_rate', '-lr', type=float, default=0.001)
     parser.add_argument('--filter_size', '-fs', type=int, default=3)
-    parser.add_argument('--stride', '-s', type=int, default=2)
+    parser.add_argument('--stride', '-st', type=int, default=2)
     parser.add_argument('--train_size', '-ts', type=float, default=0.8)
     parser.add_argument('--dataset_size', '-n', type=int, default=1000)
     parser.add_argument('--strategic_advantage', '-adv', action='store_true')
     parser.add_argument('--online_q_learning', '-on', action="store_true")
+    parser.add_argument('--seed', '-s', type=int, default=1)
 
-    args = parser.parse_args()
-
-    X, Y = load_data(args.data_path, args.dataset_size)
-    
-    in_shape = X[0].shape
-    out_size = len(np.unique(Y))
-
-    model_params = {
-        "fc_arch" : args.fc_arch,
-        "conv_arch" : args.conv_arch,
-        "filter_size" : args.filter_size,
-        "stride" : args.stride,
-        "in_shape" : in_shape,
-        "out_size" : out_size
-    }
-
-    training_params = {
-        "lr" : args.learning_rate,
-        "batch_size" : args.batch_size,
-        "num_epochs" : args.num_epochs,
-        "train_size" : args.train_size,
-        "strategic_advantage" : args.strategic_advantage
-    }
-
-    model = Net(**model_params)
-
-    A_strat = None
-
-    if args.strategic_advantage:
-        env = load(args.env_path)
-        agent = load(args.agent_path)
-        _, _, A_strat = tabular_learning(env, agent, gamma=0.9)
-    
-    train(model, X, Y, training_params, A_strat)
-
-if __name__ == '__main__':
-    main()
+    params = vars(parser.parse_args())
+    main(params)
     
