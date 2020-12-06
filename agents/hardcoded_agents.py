@@ -1,5 +1,7 @@
 import numpy as np
+
 from gym_minigrid.minigrid import IDX_TO_OBJECT, IDX_TO_COLOR, MyMiniGridEnv
+
 
 class Agent():
 
@@ -34,8 +36,10 @@ class RandAgent(Agent):
 
 
 class GoToGoodGoalAgent(Agent):
-    def __init__(self, **kwargs):
+    def __init__(self, delta=0.0, epsilon=0.0, **kwargs):
         super().__init__(**kwargs)
+        self.epsilon = epsilon
+        self.delta = delta
 
     def action(self, observation):
         good_goal_pos = None
@@ -58,15 +62,22 @@ class GoToGoodGoalAgent(Agent):
         goal_x, goal_y = good_goal_pos
 
         if agent_x > goal_x:
-            return MyMiniGridEnv.Actions.left
+            proposed_action = MyMiniGridEnv.Actions.left
         elif agent_x < goal_x:
-            return MyMiniGridEnv.Actions.right
+            proposed_action = MyMiniGridEnv.Actions.right
         elif agent_y > goal_y:
-            return MyMiniGridEnv.Actions.up
+            proposed_action = MyMiniGridEnv.Actions.up
         elif agent_y < goal_y:
-            return MyMiniGridEnv.Actions.down
+            proposed_action = MyMiniGridEnv.Actions.down
         else:
+            proposed_action = MyMiniGridEnv.Actions.stay
+
+        if np.random.random() < self.delta:
             return MyMiniGridEnv.Actions.stay
+        if np.random.random() < self.epsilon:
+            return np.random.choice([MyMiniGridEnv.Actions.left, MyMiniGridEnv.Actions.right, MyMiniGridEnv.Actions.up,
+                                     MyMiniGridEnv.Actions.down, MyMiniGridEnv.Actions.stay], size=1, p=[0.2] * 5)[0]
+        return proposed_action
 
     def action_probs(self, observation):
         probs = np.zeros(self.action_space.n)
