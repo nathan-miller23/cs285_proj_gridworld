@@ -1,5 +1,8 @@
 import numpy as np
+
 from gym_minigrid.minigrid import IDX_TO_OBJECT, IDX_TO_COLOR, MyMiniGridEnv
+from utils import mannhattan_distance
+
 
 class Agent():
 
@@ -34,10 +37,18 @@ class RandAgent(Agent):
 
 
 class GoToGoodGoalAgent(Agent):
-    def __init__(self, **kwargs):
+    def __init__(self, delta=0.0, epsilon=0.0, expected_good_goal_pos=(7, 8), **kwargs):
         super().__init__(**kwargs)
+        self.epsilon = epsilon
+        self.delta = delta
+        self.expected_good_goal_pos = expected_good_goal_pos
 
     def action(self, observation):
+        probs = self.action_probs(observation)
+        return np.random.choice(len(probs), p=probs)
+
+    def action_probs(self, observation):
+        probs = [None] * self.action_space.n
         good_goal_pos = None
         curr_pos = None
 
@@ -48,28 +59,34 @@ class GoToGoodGoalAgent(Agent):
                     good_goal_pos = (i, j)
                 elif IDX_TO_OBJECT[obj_state[0]] == 'agent':
                     curr_pos = (i, j)
-
+        
         if not good_goal_pos or not curr_pos:
             print(good_goal_pos)
             print(curr_pos)
             raise ValueError()
 
+        if not good_goal_pos == self.expected_good_goal_pos:
+            raise ValueError("This hardcoded agent expects good_goal_pos to be {} but got {}".format(self.expected_good_goal_pos, good_goal_pos))
+
         agent_x, agent_y = curr_pos
-        goal_x, goal_y = good_goal_pos
 
-        if agent_x > goal_x:
-            return MyMiniGridEnv.Actions.left
-        elif agent_x < goal_x:
-            return MyMiniGridEnv.Actions.right
-        elif agent_y > goal_y:
-            return MyMiniGridEnv.Actions.up
-        elif agent_y < goal_y:
-            return MyMiniGridEnv.Actions.down
+        if mannhattan_distance(curr_pos, good_goal_pos) == 1:
+            proposed_actions = [MyMiniGridEnv.Actions.down]
+        elif agent_x == agent_y:
+            proposed_actions = [MyMiniGridEnv.Actions.right, MyMiniGridEnv.Actions.down]
+        elif agent_x > agent_y:
+            proposed_actions = [MyMiniGridEnv.Actions.down]
         else:
-            return MyMiniGridEnv.Actions.stay
+            proposed_actions = [MyMiniGridEnv.Actions.right]
 
-    def action_probs(self, observation):
-        probs = np.zeros(self.action_space.n)
-        action = self.action(observation)
-        probs[action] = 1
+        other_actions = list(set(MyMiniGridEnv.Actions) - set(proposed_actions + [MyMiniGridEnv.Actions.stay]))
+
+        probs[MyMiniGridEnv.Actions.stay.value] = self.delta
+        for action in other_actions:
+            probs[action.value] = (1/len(other_actions)) * (1 - self.delta) * self.epsilon
+        for action in proposed_actions:
+            probs[action.value] = (1/len(proposed_actions)) * (1 - self.delta) * (1 - self.epsilon)
+
         return probs
+
+        

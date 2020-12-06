@@ -1,15 +1,19 @@
-import torch, pickle, tqdm, argparse, os, math
-
-import torch.nn.functional as F
-import torch.optim as optim
+import argparse
+import math
 import numpy as np
-
-from torch.utils.data import random_split, TensorDataset, DataLoader
+import os
+import pickle
+import torch
+import torch.optim as optim
+import tqdm
 from torch import nn
+from torch.utils.data import random_split, TensorDataset, DataLoader
+
+from utils impor load
 from rl import tabular_learning
-from generate_data import load
 
 CURR_DIR = os.path.abspath('.')
+
 
 class Net(nn.Module):
 
@@ -37,7 +41,7 @@ class Net(nn.Module):
             in_channels = channels
             in_h = math.ceil(in_h / 2)
             in_w = math.ceil(in_w / 2)
-        
+
         layers.append(nn.Flatten())
 
         in_features = in_channels * in_h * in_w
@@ -66,20 +70,22 @@ def load_data(data_path, dataset_size):
 
     return states, actions
 
+
 def strategic_advantage_weighted_cross_entropy(logits, labels, states, A_strat):
     weights = []
     for state in states:
         weights.append(A_strat(state.numpy()))
-    weights = torch.tensor(weights)
+    weights = torch.tensor(weights).unsqueeze(1)
     logprobs = torch.gather(nn.LogSoftmax(1)(logits), 1, labels.unsqueeze(1))
     losses = weights * logprobs
-    return torch.sum(losses) / torch.sum(weights)
-    
+    print(losses.shape, weights.shape, logprobs.shape)
+    return -torch.sum(losses) / torch.sum(weights)
+
 
 def train(model, X, Y, train_params, A_strat):
     X = torch.Tensor(X)
     Y = torch.Tensor(Y)
-    full_dataset = TensorDataset(X,Y)
+    full_dataset = TensorDataset(X, Y)
 
     train_size = int(train_params['train_size'] * len(full_dataset))
     test_size = len(full_dataset) - train_size
@@ -165,8 +171,9 @@ def main(params):
         env = load(params['env_path'])
         agent = load(params['agent_path'])
         _, _, A_strat = tabular_learning(env, agent, gamma=0.9)
-    
+
     train(model, X, Y, training_params, A_strat)
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

@@ -2,8 +2,9 @@ from gym_minigrid.minigrid import TILE_PIXELS, COLORS
 from gym_minigrid.rendering import highlight_img
 from gym_minigrid.envs.mygridworld import MyEnv
 from gym_minigrid.wrappers import *
-from generate_data import load
+from utils import load
 from rl import tabular_learning, get_value_table_from_states
+from agents import GoToGoodGoalAgent
 import gym_minigrid.window
 import matplotlib.cm as color
 
@@ -42,7 +43,7 @@ def show_grid_gradient(env, matrix_vals, colormap='Reds', tile_size=TILE_PIXELS,
 
 if __name__ == '__main__':
     env = load("exp_env.pkl")
-    agent = load("exp_agent.pkl")
+    agent = GoToGoodGoalAgent(action_space=env.action_space, observation_space=env.observation_space, epsilon=0.3)
     v_pi, _, A_strat = tabular_learning(env, agent, gamma=0.9, state_func=True)
     mat_vals = get_value_table_from_states(env, v_pi)
     A_strat_max = env.good_goal_reward - env.bad_goal_reward

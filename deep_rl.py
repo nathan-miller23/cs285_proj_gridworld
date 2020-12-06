@@ -1,16 +1,5 @@
 import numpy as np
-
-def softmax(x):
-    x = x.transpose()
-    e_x = np.exp(x - np.max(x))
-    return (e_x / e_x.sum(axis=0)).transpose()
-
-def KL_divergence(p, q):
-    assert len(p.shape) == 1
-    assert len(p.shape) == len(q.shape)
-    assert len(p) == len(q)
-    log_pq = np.log(p/q)
-    return np.sum(p * log_pq)
+from utils import softmax, KL_divergence
 
 def information_radius(preds, from_logits=True):
     # shape (ensemble_size, action_dim)
