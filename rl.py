@@ -1,4 +1,4 @@
-import numpy as np
+import tqdm
 
 from agents.hardcoded_agents import GoToGoodGoalAgent
 from gym_minigrid.envs.mygridworld import MyEnv
@@ -18,10 +18,9 @@ def tabular_learning(env, agent, gamma, max_iters=1e4, max_tol=1e-4, state_func=
 
 def _value_iteration(env, agent, gamma=0.9, max_iters=1e4, max_tol=1e-4):
     values_t = get_initial_value_table(env)
-    converged = False
-    i = 0
 
-    while not converged:
+    t = tqdm.trange(int(max_iters))
+    for i in t:
         delta = 0.0
         values_t_1 = values_t.copy()
 
@@ -40,9 +39,12 @@ def _value_iteration(env, agent, gamma=0.9, max_iters=1e4, max_tol=1e-4):
             values_t_1[state] = value
             delta = max(delta, abs(values_t_1[state] - values_t[state]))
 
-        converged = i > max_iters or delta < max_tol
+        t.set_description("Delta Value for Q-Learning {:.4f}".format(delta))
+        converged = i > 100 and delta < max_tol
         values_t = values_t_1
         i += 1
+        if converged:
+            break
 
     return values_t
 
@@ -75,6 +77,7 @@ def _get_a_strat_function(values_table, env, gamma, state_func):
     q_function_state = _get_q_function(values_table, env, gamma, True)
 
     def A_strat_state(s):
+        print([q_function_state(s, a) for a in env.Actions])
         return max([q_function_state(s, a) for a in env.Actions]) - min([q_function_state(s, a) for a in env.Actions])
 
     def A_strat_obs(obs):

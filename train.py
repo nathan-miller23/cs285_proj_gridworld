@@ -7,6 +7,7 @@ import torch
 import torch.optim as optim
 import tqdm
 from torch import nn
+from torch.nn import functional as F
 from torch.utils.data import random_split, TensorDataset, DataLoader
 
 from generate_data import load
@@ -72,11 +73,11 @@ def strategic_advantage_weighted_cross_entropy(logits, labels, states, A_strat):
     weights = []
     for state in states:
         weights.append(A_strat(state.numpy()))
-    weights = torch.tensor(weights).unsqueeze(1)
+    weights = F.softmax(torch.tensor(weights) + 10).unsqueeze(1) # TODO for balancing
     logprobs = torch.gather(nn.LogSoftmax(1)(logits), 1, labels.unsqueeze(1))
     losses = weights * logprobs
     print(losses.shape, weights.shape, logprobs.shape)
-    return -torch.sum(losses) / torch.sum(weights)
+    return -torch.sum(losses)
 
 
 def train(model, X, Y, train_params, A_strat):
