@@ -61,13 +61,16 @@ def main():
     parser.add_argument("--outfile_dir", "-d", default=CURR_DIR, type=str)
     parser.add_argument('--save_agent', '-sa', action='store_true')
     parser.add_argument('--save_environment', '-se', action='store_true')
+    parser.add_argument('--epsilon', '-eps', default=0.0, type=float)
+    parser.add_argument('--delta', '-dlt', default=0.0, type=float)
     args = parser.parse_args()
 
     env = MyEnv(size=9, good_goal_pos=(7, 8), bad_goal_pos=(8, 7))
     env = FullyObsWrapper(env)
     env = ImgObsWrapper(env)
 
-    agent = GoToGoodGoalAgent(observation_space=env.observation_space, action_space=env.action_space)
+    agent = GoToGoodGoalAgent(epsilon=args.epsilon, delta=args.delta,
+                              observation_space=env.observation_space, action_space=env.action_space)
 
     if args.save_agent:
         agent_save_loc = os.path.join(args.outfile_dir, "{}_agent.pkl".format(args.outfile_name))

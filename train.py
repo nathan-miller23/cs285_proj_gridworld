@@ -1,15 +1,19 @@
-import torch, pickle, tqdm, argparse, os, math
-
-import torch.nn.functional as F
-import torch.optim as optim
+import argparse
+import math
 import numpy as np
-
-from torch.utils.data import random_split, TensorDataset, DataLoader
+import os
+import pickle
+import torch
+import torch.optim as optim
+import tqdm
 from torch import nn
-from rl import tabular_learning
+from torch.utils.data import random_split, TensorDataset, DataLoader
+
 from generate_data import load
+from rl import tabular_learning
 
 CURR_DIR = os.path.abspath('.')
+
 
 class Net(nn.Module):
 
@@ -37,7 +41,7 @@ class Net(nn.Module):
             in_channels = channels
             in_h = math.ceil(in_h / 2)
             in_w = math.ceil(in_w / 2)
-        
+
         layers.append(nn.Flatten())
 
         in_features = in_channels * in_h * in_w
@@ -54,6 +58,7 @@ class Net(nn.Module):
     def forward(self, x):
         return self.net(x)
 
+
 def load_data(data_path, dataset_size):
     with open(data_path, 'rb') as f:
         data_dict = pickle.load(f)
@@ -62,20 +67,22 @@ def load_data(data_path, dataset_size):
 
     return states, actions
 
+
 def strategic_advantage_weighted_cross_entropy(logits, labels, states, A_strat):
     weights = []
     for state in states:
         weights.append(A_strat(state.numpy()))
-    weights = torch.tensor(weights)
+    weights = torch.tensor(weights).unsqueeze(1)
     logprobs = torch.gather(nn.LogSoftmax(1)(logits), 1, labels.unsqueeze(1))
     losses = weights * logprobs
-    return torch.sum(losses) / torch.sum(weights)
-    
+    print(losses.shape, weights.shape, logprobs.shape)
+    return -torch.sum(losses) / torch.sum(weights)
+
 
 def train(model, X, Y, train_params, A_strat):
     X = torch.Tensor(X)
     Y = torch.Tensor(Y)
-    full_dataset = TensorDataset(X,Y)
+    full_dataset = TensorDataset(X, Y)
 
     train_size = int(train_params['train_size'] * len(full_dataset))
     test_size = len(full_dataset) - train_size
@@ -134,7 +141,7 @@ def main():
     parser.add_argument("--data_path", "-dp", type=str, default=os.path.join(CURR_DIR, 'data.pkl'))
     parser.add_argument('--agent_path', '-ap', type=str, default=os.path.join(CURR_DIR, 'agent.pkl'))
     parser.add_argument('--env_path', '-ep', type=str, default=os.path.join(CURR_DIR, 'env.pkl'))
-    parser.add_argument('--fc_arch','-fc', nargs='+', type=int, default=[100])
+    parser.add_argument('--fc_arch', '-fc', nargs='+', type=int, default=[100])
     parser.add_argument('--conv_arch', '-cv', nargs='+', type=int, default=[8, 16])
     parser.add_argument('--num_epochs', '-e', type=int, default=100)
     parser.add_argument('--batch_size', '-b', type=int, default=2000)
@@ -149,25 +156,25 @@ def main():
     args = parser.parse_args()
 
     X, Y = load_data(args.data_path, args.dataset_size)
-    
+
     in_shape = X[0].shape
     out_size = len(np.unique(Y))
 
     model_params = {
-        "fc_arch" : args.fc_arch,
-        "conv_arch" : args.conv_arch,
-        "filter_size" : args.filter_size,
-        "stride" : args.stride,
-        "in_shape" : in_shape,
-        "out_size" : out_size
+        "fc_arch": args.fc_arch,
+        "conv_arch": args.conv_arch,
+        "filter_size": args.filter_size,
+        "stride": args.stride,
+        "in_shape": in_shape,
+        "out_size": out_size
     }
 
     training_params = {
-        "lr" : args.learning_rate,
-        "batch_size" : args.batch_size,
-        "num_epochs" : args.num_epochs,
-        "train_size" : args.train_size,
-        "strategic_advantage" : args.strategic_advantage
+        "lr": args.learning_rate,
+        "batch_size": args.batch_size,
+        "num_epochs": args.num_epochs,
+        "train_size": args.train_size,
+        "strategic_advantage": args.strategic_advantage
     }
 
     model = Net(**model_params)
@@ -178,9 +185,9 @@ def main():
         env = load(args.env_path)
         agent = load(args.agent_path)
         _, _, A_strat = tabular_learning(env, agent, gamma=0.9)
-    
+
     train(model, X, Y, training_params, A_strat)
+
 
 if __name__ == '__main__':
     main()
-    
