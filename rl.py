@@ -78,7 +78,7 @@ def _get_a_strat_function(values_table, env, gamma, state_func):
     q_function_state = _get_q_function(values_table, env, gamma, True)
 
     def A_strat_state(s):
-        print([q_function_state(s, a) for a in env.Actions])
+        #print([q_function_state(s, a) for a in env.Actions])
         return max([q_function_state(s, a) for a in env.Actions]) - min([q_function_state(s, a) for a in env.Actions])
 
     def A_strat_obs(obs):
@@ -131,7 +131,6 @@ def _find_agent(state):
                 return (i, j), encoding.copy()
 
     raise ValueError("Agent not found!")
-
 
 
 if __name__ == '__main__':

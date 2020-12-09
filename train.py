@@ -9,12 +9,19 @@ import tqdm
 from torch import nn
 from torch.nn import functional as F
 from torch.utils.data import random_split, TensorDataset, DataLoader
+from torch.utils.tensorboard import SummaryWriter
+import datetime
 
-from utils impor load
+from utils import load
 from rl import tabular_learning
 
 CURR_DIR = os.path.abspath('.')
 
+
+
+class Flatten(nn.Module):
+    def forward(self, input):
+        return input.view(input.size(0), -1)
 
 class Net(nn.Module):
 
@@ -43,7 +50,7 @@ class Net(nn.Module):
             in_h = math.ceil(in_h / 2)
             in_w = math.ceil(in_w / 2)
 
-        layers.append(nn.Flatten())
+        layers.append(Flatten())
 
         in_features = in_channels * in_h * in_w
 
@@ -83,7 +90,13 @@ def strategic_advantage_weighted_cross_entropy(logits, labels, states, A_strat):
     return -torch.sum(losses)
 
 
-def train(model, X, Y, train_params, A_strat):
+def train(model, X, Y, train_params, A_strat, env, agent):
+    logdir = "runs/"
+    if A_strat:
+        logdir += "a_strat"
+    logdir += str(len(X))
+    logdir += str(datetime.datetime.now())
+    writer = SummaryWriter(log_dir=logdir)
     X = torch.Tensor(X)
     Y = torch.Tensor(Y)
     full_dataset = TensorDataset(X, Y)
@@ -132,11 +145,24 @@ def train(model, X, Y, train_params, A_strat):
             outputs = model(inputs)
             loss = criterion(outputs, labels).item()
             val_loss += loss
+        
+        val_reward = 0.0
+        obs = env.reset()
+        done=False
+        while not done:
+            action = model(torch.Tensor(np.transpose(np.expand_dims(obs, 0), (0,3,1,2))))
+            obs, reward, done, _ = env.step(np.argmax(action.detach().numpy()))
+            val_reward += reward
+
+
         val_loss /= len(val_loader)
         train_loss /= len(train_loader)
-
+        writer.add_scalar("Loss/val_loss", val_loss, epoch)
+        writer.add_scalar("Loss/train_loss", train_loss, epoch)
+        writer.add_scalar("Reward/avg_val_reward", val_reward, epoch)
         print("")
         print("Losses at end of Epoch {}\nTrain: {}\nVal: {}".format(epoch, train_loss, val_loss))
+        print("Sample Reward at end of Epoch {}\nReward: {}".format(epoch, val_reward))
         print("")
 
 
@@ -167,13 +193,16 @@ def main(params):
     model = Net(**model_params)
 
     A_strat = None
-
+    env = None
+    agent = None
+    env = load(params['env_path'])
+    agent = load(params['agent_path'])
     if params['strategic_advantage']:
         env = load(params['env_path'])
         agent = load(params['agent_path'])
         _, _, A_strat = tabular_learning(env, agent, gamma=0.9)
 
-    train(model, X, Y, training_params, A_strat)
+    train(model, X, Y, training_params, A_strat, env, agent)
 
 
 if __name__ == '__main__':
