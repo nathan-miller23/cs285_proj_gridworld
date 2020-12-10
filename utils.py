@@ -1,7 +1,10 @@
 import numpy as np
-import pickle
+import pickle, os
 
 def save(data, outfile):
+    outfile_dir = os.path.dirname(outfile)
+    if not os.path.exists(outfile_dir):
+        os.makedirs(outfile_dir)
     with open(outfile, 'wb') as f:
         pickle.dump(data, f)
 

@@ -7,7 +7,7 @@ from gym_minigrid.wrappers import *
 from utils import mannhattan_distance
 
 
-def tabular_learning(env, agent, gamma, max_iters=1e4, max_tol=1e-4, state_func=False):
+def tabular_learning(env, agent, gamma, max_iters=1e3, max_tol=1e-4, state_func=False):
     values_table = _value_iteration(env, agent, gamma, max_iters, max_tol)
 
     value_function = _get_value_function(values_table, state_func)
@@ -41,9 +41,8 @@ def _value_iteration(env, agent, gamma=0.9, max_iters=1e4, max_tol=1e-4):
             delta = max(delta, abs(values_t_1[state] - values_t[state]))
 
         t.set_description("Delta Value for Q-Learning {:.4f}".format(delta))
-        converged = i > 100 and delta < max_tol
+        converged = delta < max_tol
         values_t = values_t_1
-        i += 1
         if converged:
             break
 

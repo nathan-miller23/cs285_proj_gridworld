@@ -3,12 +3,15 @@ from gym_minigrid.rendering import highlight_img
 from gym_minigrid.envs.mygridworld import MyEnv
 from gym_minigrid.wrappers import *
 from utils import load
-from rl import tabular_learning, get_value_table_from_states
+from rl import tabular_learning, get_value_table_from_states, get_initial_value_table, encode
 from agents import GoToGoodGoalAgent
 import gym_minigrid.window
 import matplotlib.cm as color
+import argparse, os
 
 import numpy as np
+
+CURR_DIR = os.path.abspath('.')
 
 def show_grid_gradient(env, matrix_vals, colormap='Reds', tile_size=TILE_PIXELS, scale=(0, 10), alpha=0.75, title="My Visualization"):
     if not matrix_vals.shape == (env.width, env.height):
@@ -41,13 +44,44 @@ def show_grid_gradient(env, matrix_vals, colormap='Reds', tile_size=TILE_PIXELS,
     window.show()
     return img
 
+def get_freq_table_from_data(states, env):
+    table = get_initial_value_table(env)
+    N = len(states)
+
+    for state in states:
+        table[encode(state)] += 1 / N
+
+    freq_func = lambda state : table[state]
+    return get_value_table_from_states(env, freq_func)
+
 if __name__ == '__main__':
-    env = load("exp_env.pkl")
-    agent = GoToGoodGoalAgent(action_space=env.action_space, observation_space=env.observation_space, epsilon=0.3)
-    v_pi, _, A_strat = tabular_learning(env, agent, gamma=0.9, state_func=True)
-    mat_vals = get_value_table_from_states(env, v_pi)
-    A_strat_max = env.good_goal_reward - env.bad_goal_reward
-    v_max = env.good_goal_reward
-    v_min = env.bad_goal_reward
-    show_grid_gradient(env, mat_vals, scale=None)
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--type", "-t", choices=["astrat", "values", "freq"], default="astrat")
+    parser.add_argument("--data_path", "-dp", type=str, default=os.path.join(CURR_DIR, 'data.pkl'))
+    parser.add_argument('--agent_path', '-ap', type=str, default=os.path.join(CURR_DIR, 'agent.pkl'))
+    parser.add_argument('--env_path', '-ep', type=str, default=os.path.join(CURR_DIR, 'env.pkl'))
+
+    params = vars(parser.parse_args())
+    env = load(params['env_path'])
+    agent = load(params['agent_path'])
+
+    mat_vals = None
+    scale = None
+    if params['type'] == 'astrat':
+        _, _, A_strat = tabular_learning(env, agent, gamma=0.95, state_func=True)
+        mat_vals = get_value_table_from_states(env, A_strat)
+        A_strat_max = env.good_goal_reward - env.bad_goal_reward
+        scale = (0, A_strat_max)
+    elif params['type'] == 'value':
+        v_pi, _, _ = tabular_learning(env, agent, gamma=0.95, state_func=True)
+        mat_vals = get_value_table_from_states(env, v_pi)
+        v_min = env.bad_goal_reward
+        v_max = env.good_goal_reward
+        scale = (v_min, v_max)
+    else:
+        data = load(params['data_path'])['states']
+        mat_vals = get_freq_table_from_data(data, env)
+        scale = None
+
+    show_grid_gradient(env, mat_vals, scale=scale)
     
