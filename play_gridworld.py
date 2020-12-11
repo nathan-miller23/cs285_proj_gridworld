@@ -18,7 +18,7 @@ while True:
         elif key_input == "d":
             action = Direction.right
         else:
-            action = Direction.stay
+            continue
 
         _, _, done, _ = env.step(action)
 
