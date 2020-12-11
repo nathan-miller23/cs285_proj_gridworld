@@ -12,9 +12,10 @@ class QNet(nn.Module):
 
     @staticmethod
     def _build_model(n_states, n_actions, n_hidden_layers, hidden_dim):
-        layers = [nn.Linear(n_states, hidden_dim)]
+        layers = [nn.Linear(n_states, hidden_dim), nn.ReLU()]
         for _ in range(n_hidden_layers):
             layers.append(nn.Linear(hidden_dim, hidden_dim))
+            layers.append(nn.ReLU())
         layers.append(nn.Linear(hidden_dim, n_actions))
         return nn.Sequential(*layers)
 
