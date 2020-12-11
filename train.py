@@ -19,11 +19,11 @@ from agents import AgentFromTorch
 
 CURR_DIR = os.path.abspath(os.path.dirname(__file__))
 
-
+USE_CUDA = False
 
 class Flatten(nn.Module):
     def forward(self, input):
-        return input.view(input.size(0), -1)
+        return input.reshape(input.size(0), -1)
 
 class Net(nn.Module):
 
@@ -87,7 +87,10 @@ def strategic_advantage_weighted_cross_entropy(logits, labels, states, A_strat):
     for state in states:
         weights.append(A_strat(state.numpy()))
     logprobs = torch.gather(nn.LogSoftmax(1)(logits), 1, labels.unsqueeze(1))
+    
     weights = torch.tensor(weights).unsqueeze(1)
+    if (USE_CUDA):
+        weights = weights.cuda()
     losses = weights * logprobs
     return -torch.sum(losses) / torch.sum(weights)
 
@@ -109,7 +112,8 @@ def train(model, X, Y, train_params, A_strat, env):
     criterion = nn.CrossEntropyLoss()
 
     optimizer = optim.Adam(model.parameters(), lr=train_params['learning_rate'])
-
+    global device
+    global USE_CUDA
     for epoch in range(train_params['num_epochs']):  # loop over the dataset multiple times
         train_loss = 0.0
         for i, data in tqdm.tqdm(enumerate(train_loader, 0)):
@@ -120,9 +124,15 @@ def train(model, X, Y, train_params, A_strat, env):
 
             # zero the parameter gradients
             optimizer.zero_grad()
+            if (USE_CUDA):
+                inputs = inputs.cuda()
+                labels = labels.cuda()
 
             # forward + backward + optimize
             outputs = model(inputs)
+
+            if (USE_CUDA):
+                outputs=outputs.cuda()
 
             if train_params['strategic_advantage']:
                 loss = strategic_advantage_weighted_cross_entropy(outputs, labels, states, A_strat)
@@ -141,8 +151,14 @@ def train(model, X, Y, train_params, A_strat, env):
                 states, labels = data
                 labels = labels.type(torch.long)
                 inputs = states.permute(0, 3, 1, 2)
+                if (USE_CUDA):
+                    inputs = inputs.cuda()
+                    labels = labels.cuda()
 
                 outputs = model(inputs)
+                if (USE_CUDA):
+                    outputs = outputs.cuda()
+                
                 if train_params['strategic_advantage']:
                     loss = strategic_advantage_weighted_cross_entropy(outputs, labels, states, A_strat).item()
                 else:
@@ -150,7 +166,7 @@ def train(model, X, Y, train_params, A_strat, env):
                 val_loss += loss
         
         val_rewards = []
-        eval_agent = AgentFromTorch(model)
+        eval_agent = AgentFromTorch(model, use_cuda = True)
         for _ in range(train_params['num_validation_episodes']):
             obs = env.reset()
             done=False
@@ -199,8 +215,18 @@ def main(params):
     params['in_shape'] = in_shape
     params['out_size'] = out_size
 
+    global USE_CUDA
+
+    
+        
+
     # Build network
     model = Net(**params)
+    if (params['cuda'] and torch.cuda.is_available()):
+        USE_CUDA = True
+        print("using cuda")
+        model.cuda()
+        agent.use_cuda = True
 
     A_strat = None
     if params['strategic_advantage']:
@@ -229,6 +255,7 @@ if __name__ == '__main__':
     parser.add_argument('--experiment_name', '-exp', type=str, required=True)
     parser.add_argument('--model_save_freq', '-sf', type=int, default=5)
     parser.add_argument('--seed', '-s', type=int, default=1)
+    parser.add_argument('--cuda', '-c', action='store_true')
 
     params = vars(parser.parse_args())
     main(params)
