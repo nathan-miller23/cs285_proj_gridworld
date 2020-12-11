@@ -62,7 +62,7 @@ def _get_value_function(values_table, state_func):
 def _get_q_function(values_table, env, gamma, state_func):
     def q_function_state(state, action):
         env.reset()
-        env.env.env.agent_pos = state
+        env.unwrapped.agent_pos = state
         obs_prime, reward, _, _ = env.step(action)
         state_prime = encode(obs_prime)
         return reward + gamma * values_table[state_prime]
@@ -92,7 +92,7 @@ def encode(state):
 
 def decode(state, env):
     env.reset()
-    env.env.env.agent_pos = state
+    env.unwrapped.agent_pos = state
     obs = env.step(env.Actions.stay)[0]
     return obs
 
