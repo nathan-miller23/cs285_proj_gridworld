@@ -38,6 +38,9 @@ class DoubleQNet:
     def forward(self, x):
         return self.q_net(x)
 
+    def advantage(self, x):
+        
+
     def add_data(self, s, a, r, s_, d):
         self.memory.add(s, a, r, s_, d)
 

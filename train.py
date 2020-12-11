@@ -16,6 +16,7 @@ from utils import load
 from rl import tabular_learning
 from generate_data import DATA_DIR
 from agents import AgentFromTorch
+from deep_q_net import DoubleQNet
 
 CURR_DIR = os.path.abspath(os.path.dirname(__file__))
 
@@ -218,9 +219,6 @@ def main(params):
 
     global USE_CUDA
 
-    
-        
-
     # Build network
     model = Net(**params)
     if (params['cuda'] and torch.cuda.is_available()):
@@ -232,6 +230,10 @@ def main(params):
     A_strat = None
     if params['strategic_advantage']:
         _, _, A_strat = tabular_learning(env, agent, gamma=0.9)
+    
+    if params['online_q_learning']:
+        Q_model = DoubleQNet(in_shape, out_size)
+        
 
     train(model, X, Y, params, A_strat, env)
 
