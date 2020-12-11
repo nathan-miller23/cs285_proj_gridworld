@@ -73,13 +73,17 @@ def set_seed(seed):
     np.random.seed(seed)
     torch.manual_seed(seed)
 
-def load_data(data_path, dataset_size):
+def load_data(data_path, dataset_size, rbg_observations):
     with open(data_path, 'rb') as f:
         data_dict = pickle.load(f)
     states = data_dict['states'][:dataset_size]
     actions = data_dict['actions'][:dataset_size]
 
-    return states, actions
+    if rbg_observations:
+        rbg_observations = data_dict['states_rbg'][:dataset_size]
+        return (rbg_observations, states), actions
+    else:
+        return (states,), actions
 
 
 def strategic_advantage_weighted_cross_entropy(logits, labels, states, A_strat):
@@ -99,9 +103,11 @@ def train(model, X, Y, train_params, A_strat, env):
     weight_type = "a_strat" if A_strat else "vanilla"
     logdir = os.path.join(train_params['logdir'], "{}_{}_{}".format(weight_type, train_params['experiment_name'], datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")))
     writer = SummaryWriter(log_dir=logdir)
-    X = torch.Tensor(X)
-    Y = torch.Tensor(Y)
-    full_dataset = TensorDataset(X, Y)
+    X_tensors = []
+    for i in range(len(X)):
+        X_tensors.append(torch.tensor(X[i]))
+    Y_tensor = torch.tensor(Y)
+    full_dataset = TensorDataset(*X_tensors, Y_tensor)
 
     train_size = int(train_params['train_size'] * len(full_dataset))
     test_size = len(full_dataset) - train_size
@@ -118,9 +124,14 @@ def train(model, X, Y, train_params, A_strat, env):
         train_loss = 0.0
         for i, data in tqdm.tqdm(enumerate(train_loader, 0)):
             # get the inputs; data is a list of [inputs, labels]
-            states, labels = data
+            observations = states = labels = None
+            if train_params['rbg_observations']:
+                observations, states, labels = data
+            else:
+                states, labels = data
+                observations = states
             labels = labels.type(torch.long)
-            inputs = states.permute(0, 3, 1, 2)
+            inputs = observations.permute(0, 3, 1, 2).float()
 
             # zero the parameter gradients
             optimizer.zero_grad()
@@ -148,9 +159,15 @@ def train(model, X, Y, train_params, A_strat, env):
         model.eval()
         with torch.no_grad():
             for data in val_loader:
-                states, labels = data
+                observations = states = labels = None
+                if train_params['rbg_observations']:
+                    observations, states, labels = data
+                else:
+                    states, labels = data
+                    observations = states
                 labels = labels.type(torch.long)
-                inputs = states.permute(0, 3, 1, 2)
+                inputs = observations.permute(0, 3, 1, 2).float()
+
                 if (USE_CUDA):
                     inputs = inputs.cuda()
                     labels = labels.cuda()
@@ -205,21 +222,19 @@ def main(params):
     data_load_loc = os.path.join(exp_data_dir, 'data.pkl')
     env_load_loc = os.path.join(exp_data_dir, 'env.pkl')
     agent_load_loc = os.path.join(exp_data_dir, 'agent.pkl')
+    rbg_env_load_loc = os.path.join(exp_data_dir, 'rbg_env.pkl')
 
     # Load our data
-    X, Y = load_data(data_load_loc, params['dataset_size'])
+    X, Y = load_data(data_load_loc, params['dataset_size'], params['rbg_observations'])
     env = load(env_load_loc)
     agent = load(agent_load_loc)
-    in_shape = X[0].shape
+    in_shape = X[0][0].shape
     out_size = len(np.unique(Y))
 
     params['in_shape'] = in_shape
     params['out_size'] = out_size
 
     global USE_CUDA
-
-    
-        
 
     # Build network
     model = Net(**params)
@@ -232,6 +247,9 @@ def main(params):
     A_strat = None
     if params['strategic_advantage']:
         _, _, A_strat = tabular_learning(env, agent, gamma=0.9)
+
+    if params['rbg_observations']:
+        env = load(rbg_env_load_loc)
 
     train(model, X, Y, params, A_strat, env)
 
@@ -257,6 +275,7 @@ if __name__ == '__main__':
     parser.add_argument('--model_save_freq', '-sf', type=int, default=5)
     parser.add_argument('--seed', '-s', type=int, default=1)
     parser.add_argument('--cuda', '-c', action='store_true')
+    parser.add_argument('--rbg_observations', '-rbg', action='store_true')
 
     params = vars(parser.parse_args())
     main(params)
