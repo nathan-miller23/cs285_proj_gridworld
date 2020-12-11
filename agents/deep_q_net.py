@@ -42,7 +42,9 @@ class DoubleQNet:
         self.memory.add(s, a, r, s_, d)
 
     def train_step(self, b_states, b_actions, b_rewards, b_next_states, b_done_masks):
-        target_q_val = b_rewards + b_done_masks * self.gamma * torch.max(self.target_q_net(b_next_states), dim=1)
+        target_actions = torch.argmax(self.target_q_net(b_next_states), dim=1)
+        target_q_val = b_rewards + b_done_masks * self.gamma * self.q_net(b_next_states).\
+            gather(1, target_actions.unsqueeze(1))
         loss = nn.MSELoss(self.q_net(b_states).gather(1, b_actions.unsqueeze(1)), target_q_val.detach())
 
         self.q_net_opt.zero_grad()
