@@ -166,7 +166,8 @@ def train(model, X, Y, train_params, A_strat, env):
                 val_loss += loss
         
         val_rewards = []
-        eval_agent = AgentFromTorch(model, use_cuda = True)
+        eval_agent = AgentFromTorch(model, use_cuda = USE_CUDA)
+            
         for _ in range(train_params['num_validation_episodes']):
             obs = env.reset()
             done=False
