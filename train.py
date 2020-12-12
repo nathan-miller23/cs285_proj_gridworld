@@ -32,8 +32,8 @@ class Net(nn.Module):
         super().__init__()
         self.in_shape = in_shape
         self.out_size = out_size
-        self.conv_arch = conv_arch
-        self.fc_arch = fc_arch
+        self.conv_arch = conv_arch if conv_arch else []
+        self.fc_arch = fc_arch if fc_arch else []
         self.filter_size = filter_size
         self.stride = stride
 
@@ -41,14 +41,14 @@ class Net(nn.Module):
         padding = (pad, pad)
 
         layers = []
-        in_h, in_w, in_channels = in_shape
+        in_h, in_w, in_channels = self.in_shape
         if conv_arch:
-            layers.append(nn.Conv2d(in_shape[2], self.conv_arch[0], self.filter_size, self.stride, padding=padding))
+            layers.append(nn.Conv2d(self.in_shape[2], self.conv_arch[0], self.filter_size, self.stride, padding=padding))
             in_channels = self.conv_arch[0]
             in_h = math.ceil(in_h / 2)
             in_w = math.ceil(in_w / 2)
 
-        for channels in conv_arch:
+        for channels in self.conv_arch:
             layers.append(nn.Conv2d(in_channels, channels, self.filter_size, self.stride, padding=padding))
             in_channels = channels
             in_h = math.ceil(in_h / 2)
@@ -58,12 +58,12 @@ class Net(nn.Module):
 
         in_features = in_channels * in_h * in_w
 
-        for hidden_size in fc_arch:
+        for hidden_size in self.fc_arch:
             layers.append(nn.Linear(in_features, hidden_size))
             layers.append(nn.ReLU())
             in_features = hidden_size
 
-        layers.append(nn.Linear(in_features, out_size))
+        layers.append(nn.Linear(in_features, self.out_size))
 
         self.net = nn.Sequential(*layers)
 
