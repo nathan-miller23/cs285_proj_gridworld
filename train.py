@@ -288,7 +288,7 @@ if __name__ == '__main__':
     parser.add_argument('--model_save_freq', '-sf', type=int, default=5)
     parser.add_argument('--seed', '-s', type=int, default=1)
     parser.add_argument('--cuda', '-c', action='store_true')
-    parser.add_argument('--shuffle', '-sf', action='store_true')
+    parser.add_argument('--shuffle', '-shuff', action='store_true')
     parser.add_argument('--rbg_observations', '-rbg', action='store_true')
 
     params = vars(parser.parse_args())
