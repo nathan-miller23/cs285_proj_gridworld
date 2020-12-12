@@ -12,19 +12,30 @@ class QNet(nn.Module):
 
     @staticmethod
     def _build_model(n_states, n_actions, n_hidden_layers, hidden_dim):
-        layers = [nn.Linear(n_states, hidden_dim)]
+        layers = [nn.Linear(n_states, hidden_dim), nn.ReLU()]
         for _ in range(n_hidden_layers):
             layers.append(nn.Linear(hidden_dim, hidden_dim))
+            layers.append(nn.ReLU())
         layers.append(nn.Linear(hidden_dim, n_actions))
         return nn.Sequential(*layers)
 
     def forward(self, s):
         return self.model(s)
 
+def encode(state):
+    return _find_agent(state)[0]
+
+
+def decode(state, env):
+    env.reset()
+    env.unwrapped.agent_pos = state
+    obs = env.step(env.Actions.stay)[0]
+    return obs
+
 
 class DoubleQNet:
     def __init__(self, n_states, n_actions, n_hidden_layers=2, hidden_dim=64, gamma=0.99, itr_target_update=1e1,
-                 device="cuda"):
+                 device="cuda", state_func=False):
         self.q_net = QNet(n_states, n_actions, n_hidden_layers, hidden_dim)
         self.q_net_opt = optim.Adam(self.q_net.parameters(), lr=0.001)
         self.target_q_net = QNet(n_states, n_actions, n_hidden_layers, hidden_dim)
@@ -38,11 +49,20 @@ class DoubleQNet:
     def forward(self, x):
         return self.q_net(x)
 
+    def advantage(self, s, r):
+        pass
+
+    def q(self, x, a):
+        if (not state_func):
+            x = encode(x)
+
     def add_data(self, s, a, r, s_, d):
         self.memory.add(s, a, r, s_, d)
 
     def train_step(self, b_states, b_actions, b_rewards, b_next_states, b_done_masks):
-        target_q_val = b_rewards + b_done_masks * self.gamma * torch.max(self.target_q_net(b_next_states), dim=1)
+        target_actions = torch.argmax(self.target_q_net(b_next_states), dim=1)
+        target_q_val = b_rewards + b_done_masks * self.gamma * self.q_net(b_next_states).\
+            gather(1, target_actions.unsqueeze(1))
         loss = nn.MSELoss(self.q_net(b_states).gather(1, b_actions.unsqueeze(1)), target_q_val.detach())
 
         self.q_net_opt.zero_grad()

@@ -23,7 +23,10 @@ class TightRope(MyMiniGridEnv):
             for j in range(height // 3, height // 3 * 2):
                 if i == width // 2:
                     continue
-                self.put_obj(BadGoal(), i, j)
+                elif abs(i - width // 2) == 1:
+                    self.put_obj(BadGoal(), i, j)
+                else:
+                    self.put_obj(Wall(), i, j)
 
         self.agent_pos = self.start_pos
         self.agent_dir = 0
