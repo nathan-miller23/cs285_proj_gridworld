@@ -16,7 +16,7 @@ from utils import load
 from rl import tabular_learning
 from generate_data import DATA_DIR
 from agents import AgentFromTorch
-from deep_q_net import DoubleQNet
+#from deep_q_net import DoubleQNet
 
 CURR_DIR = os.path.abspath(os.path.dirname(__file__))
 

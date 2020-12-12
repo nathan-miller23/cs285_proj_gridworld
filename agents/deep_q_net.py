@@ -21,10 +21,20 @@ class QNet(nn.Module):
     def forward(self, s):
         return self.model(s)
 
+def encode(state):
+    return _find_agent(state)[0]
+
+
+def decode(state, env):
+    env.reset()
+    env.unwrapped.agent_pos = state
+    obs = env.step(env.Actions.stay)[0]
+    return obs
+
 
 class DoubleQNet:
     def __init__(self, n_states, n_actions, n_hidden_layers=2, hidden_dim=64, gamma=0.99, itr_target_update=1e1,
-                 device="cuda"):
+                 device="cuda", state_func=False):
         self.q_net = QNet(n_states, n_actions, n_hidden_layers, hidden_dim)
         self.q_net_opt = optim.Adam(self.q_net.parameters(), lr=0.001)
         self.target_q_net = QNet(n_states, n_actions, n_hidden_layers, hidden_dim)
@@ -38,8 +48,12 @@ class DoubleQNet:
     def forward(self, x):
         return self.q_net(x)
 
-    def advantage(self, x):
-        
+    def advantage(self, s, r):
+        pass
+
+    def q(self, x, a):
+        if (not state_func):
+            x = encode(x)
 
     def add_data(self, s, a, r, s_, d):
         self.memory.add(s, a, r, s_, d)
