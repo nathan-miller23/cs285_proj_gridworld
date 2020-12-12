@@ -12,9 +12,10 @@ class QNet(nn.Module):
 
     @staticmethod
     def _build_model(n_states, n_actions, n_hidden_layers, hidden_dim):
-        layers = [nn.Linear(n_states, hidden_dim)]
+        layers = [nn.Linear(n_states, hidden_dim), nn.ReLU()]
         for _ in range(n_hidden_layers):
             layers.append(nn.Linear(hidden_dim, hidden_dim))
+            layers.append(nn.ReLU())
         layers.append(nn.Linear(hidden_dim, n_actions))
         return nn.Sequential(*layers)
 
@@ -59,7 +60,9 @@ class DoubleQNet:
         self.memory.add(s, a, r, s_, d)
 
     def train_step(self, b_states, b_actions, b_rewards, b_next_states, b_done_masks):
-        target_q_val = b_rewards + b_done_masks * self.gamma * torch.max(self.target_q_net(b_next_states), dim=1)
+        target_actions = torch.argmax(self.target_q_net(b_next_states), dim=1)
+        target_q_val = b_rewards + b_done_masks * self.gamma * self.q_net(b_next_states).\
+            gather(1, target_actions.unsqueeze(1))
         loss = nn.MSELoss(self.q_net(b_states).gather(1, b_actions.unsqueeze(1)), target_q_val.detach())
 
         self.q_net_opt.zero_grad()
