@@ -74,14 +74,22 @@ def set_seed(seed):
     np.random.seed(seed)
     torch.manual_seed(seed)
 
-def load_data(data_path, dataset_size, rbg_observations):
+def load_data(data_path, dataset_size, rbg_observations, shuffle=False):
     with open(data_path, 'rb') as f:
         data_dict = pickle.load(f)
-    states = data_dict['states'][:dataset_size]
-    actions = data_dict['actions'][:dataset_size]
+    N = len(data_dict['states'])
+    if dataset_size > N:
+        raise ValueError("Attempted to parse dataset size {} but only have {} points available".format(dataset_size, N))
+
+    idx = np.arange(N)
+    if shuffle:
+        np.random.shuffle(idx)
+    idx = idx[:dataset_size]
+    states = data_dict['states'][idx]
+    actions = data_dict['actions'][idx]
 
     if rbg_observations:
-        rbg_observations = data_dict['states_rbg'][:dataset_size]
+        rbg_observations = data_dict['states_rbg'][idx]
         return (rbg_observations, states), actions
     else:
         return (states,), actions
@@ -226,7 +234,7 @@ def main(params):
     rbg_env_load_loc = os.path.join(exp_data_dir, 'rbg_env.pkl')
 
     # Load our data
-    X, Y = load_data(data_load_loc, params['dataset_size'], params['rbg_observations'])
+    X, Y = load_data(data_load_loc, params['dataset_size'], params['rbg_observations'], params['shuffle'])
     env = load(env_load_loc)
     agent = load(agent_load_loc)
     in_shape = X[0][0].shape
@@ -280,6 +288,7 @@ if __name__ == '__main__':
     parser.add_argument('--model_save_freq', '-sf', type=int, default=5)
     parser.add_argument('--seed', '-s', type=int, default=1)
     parser.add_argument('--cuda', '-c', action='store_true')
+    parser.add_argument('--shuffle', '-sf', action='store_true')
     parser.add_argument('--rbg_observations', '-rbg', action='store_true')
 
     params = vars(parser.parse_args())
