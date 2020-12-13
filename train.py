@@ -198,6 +198,11 @@ def train(model, X, Y, train_params, A_strat, env, probs=None):
 def main(params):
     set_seed(params['seed'])
 
+    global USE_CUDA
+    if (params['cuda'] and torch.cuda.is_available()):
+        USE_CUDA = True
+        print("using cuda")
+
     # Paths Parsing
     exp_data_dir = os.path.join(params['data_dir'], params['infile_name'])
     data_load_loc = os.path.join(exp_data_dir, 'data.pkl')
@@ -207,37 +212,41 @@ def main(params):
 
     # Load our data
     X, Y, probs = load_data(data_load_loc, params['dataset_size'], params['rbg_observations'], params['shuffle'], params['calculate_empirical_action_probs'])
-    env = load(env_load_loc)
+    base_env = load(env_load_loc)
     agent = load(agent_load_loc)
-    in_shape = env.observation_space.shape
-    out_size = env.action_space.n
 
-    if X[0][0].shape != in_shape:
-        raise ValueError("Env observation space shape {} does not match data observation shape {}".format(in_shape, X[0][0].shape))
-
-    params['in_shape'] = in_shape
-    params['out_size'] = out_size
-
-    global USE_CUDA
-
-    # Build network
-    model = Net(**params)
-    if (params['cuda'] and torch.cuda.is_available()):
-        USE_CUDA = True
-        print("using cuda")
-        model.cuda()
+    if USE_CUDA:
         agent.use_cuda = True
 
+
+    # Calculate A-strat if necessary
     A_strat = None
     if params['strategic_advantage']:
         if params['use_deep_q_learning']:
             data = load(data_load_loc)
-            A_strat = train_q_network(env, data, gamma=params['gamma'], lmbda=params['lambda'], use_cuda=USE_CUDA, dataset_size=params['dataset_size'])
+            A_strat = train_q_network(base_env, data, gamma=params['gamma'], lmbda=params['lambda'], use_cuda=USE_CUDA, dataset_size=params['dataset_size'])
         else:
-            _, _, A_strat = tabular_learning(env, agent, gamma=params['gamma'])
+            _, _, A_strat = tabular_learning(base_env, agent, gamma=params['gamma'])
 
+    # Dynamically set correct environment
     if params['rbg_observations']:
         env = load(rbg_env_load_loc)
+    else:
+        env = base_env
+    
+    # Set and check shapes
+    in_shape = env.observation_space.shape
+    out_size = env.action_space.n
+    params['in_shape'] = in_shape
+    params['out_size'] = out_size
+
+    if X[0][0].shape != in_shape:
+        raise ValueError("Env observation space shape {} does not match data observation shape {}".format(in_shape, X[0][0].shape))
+
+    # Build network
+    model = Net(**params)
+    if USE_CUDA:
+        model.cuda()
 
     train(model, X, Y, params, A_strat, env, probs)
 
