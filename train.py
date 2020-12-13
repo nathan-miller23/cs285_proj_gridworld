@@ -18,24 +18,87 @@ from rl import tabular_learning
 from deep_rl import train_q_network
 from generate_data import DATA_DIR
 from agents import AgentFromTorch
+<<<<<<< HEAD
 from agents.deep_q_net import DoubleQNet
+=======
+#from deep_q_net import DoubleQNet
+>>>>>>> 77f3b3ab929200cd67560300cf8b235ddc7a2931
 
 CURR_DIR = os.path.abspath(os.path.dirname(__file__))
 
 USE_CUDA = False
 
+<<<<<<< HEAD
+=======
+class Flatten(nn.Module):
+    def forward(self, input):
+        return input.reshape(input.size(0), -1)
+
+class Net(nn.Module):
+
+    def __init__(self, in_shape, out_size, conv_arch, filter_size, stride, fc_arch, **kwargs):
+        super().__init__()
+        self.in_shape = in_shape
+        self.out_size = out_size
+        self.conv_arch = conv_arch if conv_arch else []
+        self.fc_arch = fc_arch if fc_arch else []
+        self.filter_size = filter_size
+        self.stride = stride
+
+        pad = self.filter_size // 2
+        padding = (pad, pad)
+
+        layers = []
+        in_h, in_w, in_channels = self.in_shape
+        if conv_arch:
+            layers.append(nn.Conv2d(self.in_shape[2], self.conv_arch[0], self.filter_size, self.stride, padding=padding))
+            in_channels = self.conv_arch[0]
+            in_h = math.ceil(in_h / 2)
+            in_w = math.ceil(in_w / 2)
+
+        for channels in self.conv_arch:
+            layers.append(nn.Conv2d(in_channels, channels, self.filter_size, self.stride, padding=padding))
+            in_channels = channels
+            in_h = math.ceil(in_h / 2)
+            in_w = math.ceil(in_w / 2)
+
+        layers.append(Flatten())
+
+        in_features = in_channels * in_h * in_w
+
+        for hidden_size in self.fc_arch:
+            layers.append(nn.Linear(in_features, hidden_size))
+            layers.append(nn.ReLU())
+            in_features = hidden_size
+
+        layers.append(nn.Linear(in_features, self.out_size))
+
+        self.net = nn.Sequential(*layers)
+
+    def forward(self, x):
+        return self.net(x)
+
+>>>>>>> 77f3b3ab929200cd67560300cf8b235ddc7a2931
 def set_seed(seed):
     np.random.seed(seed)
     torch.manual_seed(seed)
 
-def load_data(data_path, dataset_size, rbg_observations):
+def load_data(data_path, dataset_size, rbg_observations, shuffle=False):
     with open(data_path, 'rb') as f:
         data_dict = pickle.load(f)
-    states = data_dict['states'][:dataset_size]
-    actions = data_dict['actions'][:dataset_size]
+    N = len(data_dict['states'])
+    if dataset_size > N:
+        raise ValueError("Attempted to parse dataset size {} but only have {} points available".format(dataset_size, N))
+
+    idx = np.arange(N)
+    if shuffle:
+        np.random.shuffle(idx)
+    idx = idx[:dataset_size]
+    states = data_dict['states'][idx]
+    actions = data_dict['actions'][idx]
 
     if rbg_observations:
-        rbg_observations = data_dict['states_rbg'][:dataset_size]
+        rbg_observations = data_dict['states_rbg'][idx]
         return (rbg_observations, states), actions
     else:
         return (states,), actions
@@ -180,7 +243,7 @@ def main(params):
     rbg_env_load_loc = os.path.join(exp_data_dir, 'rbg_env.pkl')
 
     # Load our data
-    X, Y = load_data(data_load_loc, params['dataset_size'], params['rbg_observations'])
+    X, Y = load_data(data_load_loc, params['dataset_size'], params['rbg_observations'], params['shuffle'])
     env = load(env_load_loc)
     agent = load(agent_load_loc)
     in_shape = X[0][0].shape
@@ -203,6 +266,7 @@ def main(params):
     q_net = None
     print(X[0].shape, out_size)
     if params['strategic_advantage']:
+<<<<<<< HEAD
         if params['use_deep_q_learning']:
             q_net = DoubleQNet(in_shape, out_size, device="cuda" if USE_CUDA else "cpu")
             with open(data_load_loc, 'rb') as f:
@@ -210,6 +274,13 @@ def main(params):
                 A_strat = train_q_network(q_net, expert_data_dict) # being done rn
         else:
             _, _, A_strat = tabular_learning(env, agent, gamma=0.9)
+=======
+        _, _, A_strat = tabular_learning(env, agent, gamma=0.9)
+    
+    if params['online_q_learning']:
+        Q_model = DoubleQNet(in_shape, out_size)
+        
+>>>>>>> 77f3b3ab929200cd67560300cf8b235ddc7a2931
 
     if params['rbg_observations']:
         env = load(rbg_env_load_loc)
@@ -238,6 +309,7 @@ if __name__ == '__main__':
     parser.add_argument('--model_save_freq', '-sf', type=int, default=5)
     parser.add_argument('--seed', '-s', type=int, default=1)
     parser.add_argument('--cuda', '-c', action='store_true')
+    parser.add_argument('--shuffle', '-shuff', action='store_true')
     parser.add_argument('--rbg_observations', '-rbg', action='store_true')
 
     params = vars(parser.parse_args())

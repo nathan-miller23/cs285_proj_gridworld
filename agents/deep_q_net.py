@@ -23,7 +23,6 @@ from agents.replay_buffer import ReplayBuffer
 #     def forward(self, s):
 #         return self.model(s)
 
-
 class DoubleQNet:
     def __init__(self, state_dim, n_actions, gamma=0.99, lmbda=1.0, itr_target_update=1e1, device="cuda"): # TODO add ability to customize architecture
         self.q_net = Net(state_dim, n_actions).to(device)
