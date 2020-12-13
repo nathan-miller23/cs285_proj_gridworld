@@ -1,7 +1,9 @@
-from gym_minigrid.envs.tightrope import TightRope
+# from gym_minigrid.envs.tightrope import TightRope
+from gym_minigrid.envs.randompoints import RandomPoints
 from gym_minigrid.minigrid import Direction
 
-env = TightRope()
+# env = TightRope()
+env = RandomPoints()
 
 while True:
     _ = env.reset()

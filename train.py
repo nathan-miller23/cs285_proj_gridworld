@@ -12,62 +12,17 @@ from torch.utils.data import random_split, TensorDataset, DataLoader
 from torch.utils.tensorboard import SummaryWriter
 import datetime
 
+from agents.network import Net
 from utils import load
 from rl import tabular_learning
+from deep_rl import train_q_network
 from generate_data import DATA_DIR
 from agents import AgentFromTorch
+from agents.deep_q_net import DoubleQNet
 
 CURR_DIR = os.path.abspath(os.path.dirname(__file__))
 
 USE_CUDA = False
-
-class Flatten(nn.Module):
-    def forward(self, input):
-        return input.reshape(input.size(0), -1)
-
-class Net(nn.Module):
-
-    def __init__(self, in_shape, out_size, conv_arch, filter_size, stride, fc_arch, **kwargs):
-        super().__init__()
-        self.in_shape = in_shape
-        self.out_size = out_size
-        self.conv_arch = conv_arch
-        self.fc_arch = fc_arch
-        self.filter_size = filter_size
-        self.stride = stride
-
-        pad = self.filter_size // 2
-        padding = (pad, pad)
-
-        layers = []
-        in_h, in_w, in_channels = in_shape
-        if conv_arch:
-            layers.append(nn.Conv2d(in_shape[2], self.conv_arch[0], self.filter_size, self.stride, padding=padding))
-            in_channels = self.conv_arch[0]
-            in_h = math.ceil(in_h / 2)
-            in_w = math.ceil(in_w / 2)
-
-        for channels in conv_arch:
-            layers.append(nn.Conv2d(in_channels, channels, self.filter_size, self.stride, padding=padding))
-            in_channels = channels
-            in_h = math.ceil(in_h / 2)
-            in_w = math.ceil(in_w / 2)
-
-        layers.append(Flatten())
-
-        in_features = in_channels * in_h * in_w
-
-        for hidden_size in fc_arch:
-            layers.append(nn.Linear(in_features, hidden_size))
-            layers.append(nn.ReLU())
-            in_features = hidden_size
-
-        layers.append(nn.Linear(in_features, out_size))
-
-        self.net = nn.Sequential(*layers)
-
-    def forward(self, x):
-        return self.net(x)
 
 def set_seed(seed):
     np.random.seed(seed)
@@ -245,8 +200,16 @@ def main(params):
         agent.use_cuda = True
 
     A_strat = None
+    q_net = None
+    print(X[0].shape, out_size)
     if params['strategic_advantage']:
-        _, _, A_strat = tabular_learning(env, agent, gamma=0.9)
+        if params['use_deep_q_learning']:
+            q_net = DoubleQNet(in_shape, out_size, device="cuda" if USE_CUDA else "cpu")
+            with open(data_load_loc, 'rb') as f:
+                expert_data_dict = pickle.load(f) 
+                A_strat = train_q_network(q_net, expert_data_dict) # being done rn
+        else:
+            _, _, A_strat = tabular_learning(env, agent, gamma=0.9)
 
     if params['rbg_observations']:
         env = load(rbg_env_load_loc)
@@ -269,7 +232,7 @@ if __name__ == '__main__':
     parser.add_argument('--dataset_size', '-n', type=int, default=1000)
     parser.add_argument('--num_validation_episodes', '-nv', type=int, default=100)
     parser.add_argument('--strategic_advantage', '-adv', action='store_true')
-    parser.add_argument('--online_q_learning', '-on', action="store_true")
+    parser.add_argument('--use_deep_q_learning', '-deep_q', action="store_true")
     parser.add_argument('--logdir', '-ld', type=str, default=os.path.join(CURR_DIR, 'runs'))
     parser.add_argument('--experiment_name', '-exp', type=str, required=True)
     parser.add_argument('--model_save_freq', '-sf', type=int, default=5)
