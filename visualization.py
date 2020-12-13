@@ -3,11 +3,14 @@ from gym_minigrid.rendering import highlight_img
 from gym_minigrid.envs.mygridworld import MyEnv
 from gym_minigrid.wrappers import *
 from utils import load
-from rl import tabular_learning, get_value_table_from_states, get_initial_value_table, encode
-from agents import GoToGoodGoalAgent
+from rl import tabular_learning, get_value_table_from_states, get_initial_value_table, encode, get_value_table_from_obs
+from agents import GoToGoodGoalAgent, AgentFromTorchEnsemble
+from train import LOG_DIR, Net
+from generate_data import DATA_DIR
 import gym_minigrid.window
 import matplotlib.cm as color
-import argparse, os
+import argparse, os, torch
+
 
 import numpy as np
 
@@ -56,32 +59,45 @@ def get_freq_table_from_data(states, env):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("--type", "-t", choices=["astrat", "values", "freq"], default="astrat")
-    parser.add_argument("--data_path", "-dp", type=str, default=os.path.join(CURR_DIR, 'data.pkl'))
-    parser.add_argument('--agent_path', '-ap', type=str, default=os.path.join(CURR_DIR, 'agent.pkl'))
-    parser.add_argument('--env_path', '-ep', type=str, default=os.path.join(CURR_DIR, 'env.pkl'))
-
+    parser.add_argument("--type", "-t", choices=["astrat", "values", "freq", "uncertainty"], default="astrat")
+    parser.add_argument("--agent_checkpoints", '-cpts', nargs='+', type=str, default=LOG_DIR)
+    parser.add_argument("--data_dir", "-dp", type=str, default=DATA_DIR)
+    parser.add_argument('--infile_name', '-i', type=str, default="my_exp")
     params = vars(parser.parse_args())
-    env = load(params['env_path'])
-    agent = load(params['agent_path'])
+
+    exp_dir = os.path.join(params['data_dir'], params['infile_name'])
+    env_load_loc, agent_load_loc = os.path.join(exp_dir, 'env.pkl'), os.path.join(exp_dir, 'agent.pkl')
+    data_load_loc = os.path.join(exp_dir, 'data.pkl')
 
     mat_vals = None
     scale = None
     if params['type'] == 'astrat':
+        env, agent = load(env_load_loc), load(agent_load_loc)
         _, _, A_strat = tabular_learning(env, agent, gamma=0.95, state_func=True)
         mat_vals = get_value_table_from_states(env, A_strat)
         A_strat_max = env.good_goal_reward - env.bad_goal_reward
         scale = (0, A_strat_max)
     elif params['type'] == 'value':
+        env, agent = load(env_load_loc), load(agent_load_loc)
         v_pi, _, _ = tabular_learning(env, agent, gamma=0.95, state_func=True)
         mat_vals = get_value_table_from_states(env, v_pi)
         v_min = env.bad_goal_reward
         v_max = env.good_goal_reward
         scale = (v_min, v_max)
-    else:
-        data = load(params['data_path'])['states']
+    elif params['type'] == 'freq':
+        data = load(data_load_loc)['states']
         mat_vals = get_freq_table_from_data(data, env)
         scale = None
+    else:
+        ensemble = []
+        for checkpoint in params['agent_checkpoints']:
+            state_dict, params = torch.load(checkpoint, map_location=torch.device('cpu'))
+            model = Net(**params)
+            model.load_state_dict(state_dict)
+            ensemble.append(model)
+        agent = AgentFromTorchEnsemble(ensemble)
+        env = load(env_load_loc)
+        mat_vals = get_value_table_from_obs(env, agent.uncertainty)
 
     show_grid_gradient(env, mat_vals, scale=scale)
     

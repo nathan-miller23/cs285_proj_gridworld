@@ -19,6 +19,7 @@ from agents import AgentFromTorch
 #from deep_q_net import DoubleQNet
 
 CURR_DIR = os.path.abspath(os.path.dirname(__file__))
+LOG_DIR = os.path.join(CURR_DIR, 'runs')
 
 USE_CUDA = False
 
@@ -192,7 +193,7 @@ def train(model, X, Y, train_params, A_strat, env):
                 val_loss += loss
         
         val_rewards = []
-        eval_agent = AgentFromTorch(model, use_cuda = USE_CUDA)
+        eval_agent = AgentFromTorch(model, use_cuda=USE_CUDA)
             
         for _ in range(train_params['num_validation_episodes']):
             obs = env.reset()
@@ -216,7 +217,7 @@ def train(model, X, Y, train_params, A_strat, env):
         writer.add_scalar("Reward/val_reward_std", val_reward_std, epoch)
 
         if epoch % train_params['model_save_freq'] == 0:
-            torch.save(model.state_dict(), os.path.join(logdir, "checkpoint_{}".format(epoch)))
+            torch.save((model.state_dict(), train_params), os.path.join(logdir, "checkpoint_{}".format(epoch)))
         print("")
         print("Losses at end of Epoch {}\nTrain: {}\nVal: {}".format(epoch, train_loss, val_loss))
         print("Sample Reward at end of Epoch {}\nReward: {}".format(epoch, val_reward_mean))
@@ -283,7 +284,7 @@ if __name__ == '__main__':
     parser.add_argument('--num_validation_episodes', '-nv', type=int, default=100)
     parser.add_argument('--strategic_advantage', '-adv', action='store_true')
     parser.add_argument('--online_q_learning', '-on', action="store_true")
-    parser.add_argument('--logdir', '-ld', type=str, default=os.path.join(CURR_DIR, 'runs'))
+    parser.add_argument('--logdir', '-ld', type=str, default=LOG_DIR)
     parser.add_argument('--experiment_name', '-exp', type=str, required=True)
     parser.add_argument('--model_save_freq', '-sf', type=int, default=5)
     parser.add_argument('--seed', '-s', type=int, default=1)
