@@ -10,11 +10,12 @@ from torch import nn
 from torch.nn import functional as F
 from torch.utils.data import random_split, TensorDataset, DataLoader
 from torch.utils.tensorboard import SummaryWriter
+from collections import Counter
 import datetime
 
 from agents.network import Net
 from utils import load, DATA_DIR, LOG_DIR
-from rl import tabular_learning
+from rl import tabular_learning, encode
 from deep_rl import train_q_network
 from generate_data import DATA_DIR
 from agents import AgentFromTorch
@@ -25,7 +26,7 @@ def set_seed(seed):
     np.random.seed(seed)
     torch.manual_seed(seed)
 
-def load_data(data_path, dataset_size, rbg_observations, shuffle=False):
+def load_data(data_path, dataset_size, rbg_observations, shuffle=False, calculate_empirical_action_probs=False):
     with open(data_path, 'rb') as f:
         data_dict = pickle.load(f)
     N = len(data_dict['states'])
@@ -41,9 +42,25 @@ def load_data(data_path, dataset_size, rbg_observations, shuffle=False):
 
     if rbg_observations:
         rbg_observations = data_dict['states_rbg'][idx]
-        return (rbg_observations, states), actions
+        X, Y = (rbg_observations, states), actions
     else:
-        return (states,), actions
+        X, Y = (states,), actions
+
+    if calculate_empirical_action_probs:
+        samples = (states, actions)
+        pertinent_actions = [transition[1] for transition in zip(*samples) if encode(transition[0]) == (7, 7)]
+        c = Counter()
+        c.update(pertinent_actions)
+        n = len(pertinent_actions)
+        action_counts = [0] * 5
+        for action_idx, count in c.items():
+            action_counts[action_idx] = count
+        action_probs = np.array(action_counts) / n
+        return X, Y, action_probs
+    else:
+        return X, Y, None
+
+    
 
 
 def strategic_advantage_weighted_cross_entropy(logits, labels, states, A_strat):
@@ -59,7 +76,7 @@ def strategic_advantage_weighted_cross_entropy(logits, labels, states, A_strat):
     return -torch.sum(losses) / torch.sum(weights)
 
 
-def train(model, X, Y, train_params, A_strat, env):
+def train(model, X, Y, train_params, A_strat, env, probs=None):
     weight_type = "a_strat" if A_strat else "vanilla"
     logdir = os.path.join(train_params['logdir'], "{}_{}_{}".format(weight_type, train_params['experiment_name'], datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")))
     writer = SummaryWriter(log_dir=logdir)
@@ -166,6 +183,10 @@ def train(model, X, Y, train_params, A_strat, env):
         writer.add_scalar("Reward/val_reward_mean", val_reward_mean, epoch)
         writer.add_scalar("Reward/val_reward_std", val_reward_std, epoch)
 
+        if train_params['calculate_empirical_action_probs']:
+            for i, prob in enumerate(probs):
+                writer.add_scalar("Policy/action_{}_empirical_prob".format(i), prob, epoch)
+
         if epoch % train_params['model_save_freq'] == 0:
             torch.save((model.state_dict(), train_params), os.path.join(logdir, "checkpoint_{}".format(epoch)))
         print("")
@@ -185,7 +206,7 @@ def main(params):
     rbg_env_load_loc = os.path.join(exp_data_dir, 'rbg_env.pkl')
 
     # Load our data
-    X, Y = load_data(data_load_loc, params['dataset_size'], params['rbg_observations'], params['shuffle'])
+    X, Y, probs = load_data(data_load_loc, params['dataset_size'], params['rbg_observations'], params['shuffle'], params['calculate_empirical_action_probs'])
     env = load(env_load_loc)
     agent = load(agent_load_loc)
     in_shape = env.observation_space.shape
@@ -218,7 +239,7 @@ def main(params):
     if params['rbg_observations']:
         env = load(rbg_env_load_loc)
 
-    train(model, X, Y, params, A_strat, env)
+    train(model, X, Y, params, A_strat, env, probs)
 
 
 if __name__ == '__main__':
@@ -246,6 +267,7 @@ if __name__ == '__main__':
     parser.add_argument('--lambda', '-lam', type=float, default=1.0)
     parser.add_argument('--gamma', '-gam', type=float, default=0.95)
     parser.add_argument('--rbg_observations', '-rbg', action='store_true')
+    parser.add_argument('--calculate_empirical_action_probs', '-empi', action='store_true')
 
     params = vars(parser.parse_args())
     main(params)
