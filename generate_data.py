@@ -4,10 +4,7 @@ import numpy as np
 from gym_minigrid.envs.mygridworld import MyEnv
 from gym_minigrid.wrappers import *
 from agents.hardcoded_agents import GoToGoodGoalAgent
-from utils import save, load
-
-CURR_DIR = os.path.abspath(os.path.dirname(__file__))
-DATA_DIR = os.path.join(CURR_DIR, 'data')
+from utils import save, load, DATA_DIR
 
 def generate_data(env, agent, outfile, num_timesteps, collect_rbg, tile_size):
     states_rbg = []

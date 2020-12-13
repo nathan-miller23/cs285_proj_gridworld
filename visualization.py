@@ -2,40 +2,16 @@ from gym_minigrid.minigrid import TILE_PIXELS, COLORS
 from gym_minigrid.rendering import highlight_img
 from gym_minigrid.envs.mygridworld import MyEnv
 from gym_minigrid.wrappers import *
-from utils import load
+from utils import load, DATA_DIR, LOG_DIR
 from rl import tabular_learning, get_value_table_from_states, get_initial_value_table, encode, get_value_table_from_obs
-from agents import GoToGoodGoalAgent, AgentFromTorchEnsemble
-from train import LOG_DIR, Net
-from generate_data import DATA_DIR
+from deep_rl import train_q_network
+from agents import GoToGoodGoalAgent, AgentFromTorchEnsemble, AgentFromTorch, Net
 import gym_minigrid.window
-import matplotlib.cm as color
 import argparse, os, torch
 
-import argparse
-import math
-import numpy as np
-import os
-import pickle
-import torch
-import torch.optim as optim
-import tqdm
-from torch import nn
-from torch.nn import functional as F
-from torch.utils.data import random_split, TensorDataset, DataLoader
-from torch.utils.tensorboard import SummaryWriter
-import datetime
-
-from agents.network import Net
-from utils import load
-from rl import tabular_learning
-from deep_rl import train_q_network
-from generate_data import DATA_DIR
-from agents import AgentFromTorch
-from agents.deep_q_net import DoubleQNet
-
+import matplotlib.cm as color
 import numpy as np
 
-CURR_DIR = os.path.abspath('.')
 
 def show_grid_gradient(env, matrix_vals, colormap='Reds', tile_size=TILE_PIXELS, scale=(0, 10), alpha=0.75, title="My Visualization"):
     if not matrix_vals.shape == (env.width, env.height):
@@ -80,10 +56,20 @@ def get_freq_table_from_data(states, env):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument("--type", "-t", choices=["astrat", "values", "freq", "uncertainty"], default="astrat")
-    parser.add_argument("--agent_checkpoints", '-cpts', nargs='+', type=str, default=LOG_DIR)
+    parser.add_argument("--type", "-t", choices=["astrat_tab", "astrat_deep", "values", "freq", "uncertainty"], default="astrat_tab")
     parser.add_argument("--data_dir", "-dp", type=str, default=DATA_DIR)
     parser.add_argument('--infile_name', '-i', type=str, default="my_exp")
+
+    # Only pertinent for type=astrat_deep|freq
+    parser.add_argument('--dataset_size', '-n', type=int, default=1000)
+
+    # Only pertinent for type=astrat_deep
+    parser.add_argument('--cuda', '-c', action='store_true')
+    parser.add_argument('--max_iters', '-it', type=int, default=10000)
+    parser.add_argument('--lambda', '-lam', type=float, default=1.0)
+
+    # Only pertinent for type=uncertainty
+    parser.add_argument("--agent_checkpoints", '-cpts', nargs='+', type=str, default=LOG_DIR)
     params = vars(parser.parse_args())
 
     exp_dir = os.path.join(params['data_dir'], params['infile_name'])
@@ -92,13 +78,15 @@ if __name__ == '__main__':
 
     mat_vals = None
     scale = None
-    if params['type'] == 'astrat':
+    if params['type'] == 'astrat_tab':
         env, agent = load(env_load_loc), load(agent_load_loc)
-        q_net = DoubleQNet((9, 9, 3), 5, device="cuda")
-        with open(data_load_loc, 'rb') as f:
-            expert_data_dict = pickle.load(f) 
-            A_strat = train_q_network(q_net, expert_data_dict, max_iters=10000)
-        # _, _, A_strat = tabular_learning(env, agent, gamma=0.95, state_func=True)
+        _, _, A_strat = tabular_learning(env, agent, gamma=0.95, state_func=True)
+        mat_vals = get_value_table_from_states(env, A_strat)
+        A_strat_max = env.good_goal_reward - env.bad_goal_reward
+        scale = (0, A_strat_max)
+    elif params['type'] == 'astrat_deep':
+        env, data = load(env_load_loc), load(data_load_loc)
+        A_strat = train_q_network(env, data, gamma=0.95, lmbda=params['lambda'], use_cuda=params['cuda'], max_iters=params['max_iters'], dataset_size=params['dataset_size'])
         mat_vals = get_value_table_from_obs(env, A_strat)
         A_strat_max = env.good_goal_reward - env.bad_goal_reward
         scale = (0, A_strat_max)
@@ -110,7 +98,7 @@ if __name__ == '__main__':
         v_max = env.good_goal_reward
         scale = (v_min, v_max)
     elif params['type'] == 'freq':
-        data = load(data_load_loc)['states']
+        data, env = load(data_load_loc)['states'][:params['dataset_size']], load(env_load_loc)
         mat_vals = get_freq_table_from_data(data, env)
         scale = None
     else:

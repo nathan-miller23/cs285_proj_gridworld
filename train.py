@@ -13,15 +13,11 @@ from torch.utils.tensorboard import SummaryWriter
 import datetime
 
 from agents.network import Net
-from utils import load
+from utils import load, DATA_DIR, LOG_DIR
 from rl import tabular_learning
 from deep_rl import train_q_network
 from generate_data import DATA_DIR
 from agents import AgentFromTorch
-from agents.deep_q_net import DoubleQNet
-
-CURR_DIR = os.path.abspath(os.path.dirname(__file__))
-LOG_DIR = os.path.join(CURR_DIR, 'runs')
 
 USE_CUDA = False
 
@@ -192,8 +188,11 @@ def main(params):
     X, Y = load_data(data_load_loc, params['dataset_size'], params['rbg_observations'], params['shuffle'])
     env = load(env_load_loc)
     agent = load(agent_load_loc)
-    in_shape = X[0][0].shape
-    out_size = len(np.unique(Y))
+    in_shape = env.observation_space.shape
+    out_size = env.action_space.n
+
+    if not X[0][0].shape != in_shape:
+        raise ValueError("Env observation space shape {} does not match data observation shape {}".format(in_shape, X[0][0].shape))
 
     params['in_shape'] = in_shape
     params['out_size'] = out_size
@@ -209,16 +208,12 @@ def main(params):
         agent.use_cuda = True
 
     A_strat = None
-    q_net = None
-    print(X[0].shape, out_size)
     if params['strategic_advantage']:
         if params['use_deep_q_learning']:
-            q_net = DoubleQNet(in_shape, out_size, device="cuda" if USE_CUDA else "cpu")
-            with open(data_load_loc, 'rb') as f:
-                expert_data_dict = pickle.load(f) 
-                A_strat = train_q_network(q_net, expert_data_dict) # being done rn
+            data = load(data_load_loc)
+            A_strat = train_q_network(env, data, gamma=params['gamma'], lmbda=params['lambda'], use_cuda=USE_CUDA, dataset_size=params['dataset_size'])
         else:
-            _, _, A_strat = tabular_learning(env, agent, gamma=0.9)
+            _, _, A_strat = tabular_learning(env, agent, gamma=params['gamma'])
 
     if params['rbg_observations']:
         env = load(rbg_env_load_loc)
@@ -248,6 +243,8 @@ if __name__ == '__main__':
     parser.add_argument('--seed', '-s', type=int, default=1)
     parser.add_argument('--cuda', '-c', action='store_true')
     parser.add_argument('--shuffle', '-shuff', action='store_true')
+    parser.add_argument('--lambda', '-lam', type=float, default=1.0)
+    parser.add_argument('--gamma', '-gam', type=float, default=0.95)
     parser.add_argument('--rbg_observations', '-rbg', action='store_true')
 
     params = vars(parser.parse_args())

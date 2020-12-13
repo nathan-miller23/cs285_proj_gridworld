@@ -1,6 +1,5 @@
 from agents import Agent
-from utils import softmax
-from deep_rl import information_radius_batched
+from utils import softmax, information_radius_batched
 import torch
 import numpy as np
 
