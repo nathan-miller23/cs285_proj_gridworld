@@ -18,67 +18,13 @@ from rl import tabular_learning
 from deep_rl import train_q_network
 from generate_data import DATA_DIR
 from agents import AgentFromTorch
-<<<<<<< HEAD
 from agents.deep_q_net import DoubleQNet
-=======
-#from deep_q_net import DoubleQNet
->>>>>>> 77f3b3ab929200cd67560300cf8b235ddc7a2931
 
 CURR_DIR = os.path.abspath(os.path.dirname(__file__))
+LOG_DIR = os.path.join(CURR_DIR, 'runs')
 
 USE_CUDA = False
 
-<<<<<<< HEAD
-=======
-class Flatten(nn.Module):
-    def forward(self, input):
-        return input.reshape(input.size(0), -1)
-
-class Net(nn.Module):
-
-    def __init__(self, in_shape, out_size, conv_arch, filter_size, stride, fc_arch, **kwargs):
-        super().__init__()
-        self.in_shape = in_shape
-        self.out_size = out_size
-        self.conv_arch = conv_arch if conv_arch else []
-        self.fc_arch = fc_arch if fc_arch else []
-        self.filter_size = filter_size
-        self.stride = stride
-
-        pad = self.filter_size // 2
-        padding = (pad, pad)
-
-        layers = []
-        in_h, in_w, in_channels = self.in_shape
-        if conv_arch:
-            layers.append(nn.Conv2d(self.in_shape[2], self.conv_arch[0], self.filter_size, self.stride, padding=padding))
-            in_channels = self.conv_arch[0]
-            in_h = math.ceil(in_h / 2)
-            in_w = math.ceil(in_w / 2)
-
-        for channels in self.conv_arch:
-            layers.append(nn.Conv2d(in_channels, channels, self.filter_size, self.stride, padding=padding))
-            in_channels = channels
-            in_h = math.ceil(in_h / 2)
-            in_w = math.ceil(in_w / 2)
-
-        layers.append(Flatten())
-
-        in_features = in_channels * in_h * in_w
-
-        for hidden_size in self.fc_arch:
-            layers.append(nn.Linear(in_features, hidden_size))
-            layers.append(nn.ReLU())
-            in_features = hidden_size
-
-        layers.append(nn.Linear(in_features, self.out_size))
-
-        self.net = nn.Sequential(*layers)
-
-    def forward(self, x):
-        return self.net(x)
-
->>>>>>> 77f3b3ab929200cd67560300cf8b235ddc7a2931
 def set_seed(seed):
     np.random.seed(seed)
     torch.manual_seed(seed)
@@ -201,7 +147,7 @@ def train(model, X, Y, train_params, A_strat, env):
                 val_loss += loss
         
         val_rewards = []
-        eval_agent = AgentFromTorch(model, use_cuda = USE_CUDA)
+        eval_agent = AgentFromTorch(model, use_cuda=USE_CUDA)
             
         for _ in range(train_params['num_validation_episodes']):
             obs = env.reset()
@@ -225,7 +171,7 @@ def train(model, X, Y, train_params, A_strat, env):
         writer.add_scalar("Reward/val_reward_std", val_reward_std, epoch)
 
         if epoch % train_params['model_save_freq'] == 0:
-            torch.save(model.state_dict(), os.path.join(logdir, "checkpoint_{}".format(epoch)))
+            torch.save((model.state_dict(), train_params), os.path.join(logdir, "checkpoint_{}".format(epoch)))
         print("")
         print("Losses at end of Epoch {}\nTrain: {}\nVal: {}".format(epoch, train_loss, val_loss))
         print("Sample Reward at end of Epoch {}\nReward: {}".format(epoch, val_reward_mean))
@@ -303,8 +249,13 @@ if __name__ == '__main__':
     parser.add_argument('--dataset_size', '-n', type=int, default=1000)
     parser.add_argument('--num_validation_episodes', '-nv', type=int, default=100)
     parser.add_argument('--strategic_advantage', '-adv', action='store_true')
+<<<<<<< HEAD
     parser.add_argument('--use_deep_q_learning', '-deep_q', action="store_true")
     parser.add_argument('--logdir', '-ld', type=str, default=os.path.join(CURR_DIR, 'runs'))
+=======
+    parser.add_argument('--online_q_learning', '-on', action="store_true")
+    parser.add_argument('--logdir', '-ld', type=str, default=LOG_DIR)
+>>>>>>> 67443ab07d974fd43ad34d8d2035e6cdd06757d3
     parser.add_argument('--experiment_name', '-exp', type=str, required=True)
     parser.add_argument('--model_save_freq', '-sf', type=int, default=5)
     parser.add_argument('--seed', '-s', type=int, default=1)
