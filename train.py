@@ -212,7 +212,6 @@ def main(params):
     q_net = None
     print(X[0].shape, out_size)
     if params['strategic_advantage']:
-<<<<<<< HEAD
         if params['use_deep_q_learning']:
             q_net = DoubleQNet(in_shape, out_size, device="cuda" if USE_CUDA else "cpu")
             with open(data_load_loc, 'rb') as f:
@@ -220,13 +219,6 @@ def main(params):
                 A_strat = train_q_network(q_net, expert_data_dict) # being done rn
         else:
             _, _, A_strat = tabular_learning(env, agent, gamma=0.9)
-=======
-        _, _, A_strat = tabular_learning(env, agent, gamma=0.9)
-    
-    if params['online_q_learning']:
-        Q_model = DoubleQNet(in_shape, out_size)
-        
->>>>>>> 77f3b3ab929200cd67560300cf8b235ddc7a2931
 
     if params['rbg_observations']:
         env = load(rbg_env_load_loc)
@@ -249,13 +241,8 @@ if __name__ == '__main__':
     parser.add_argument('--dataset_size', '-n', type=int, default=1000)
     parser.add_argument('--num_validation_episodes', '-nv', type=int, default=100)
     parser.add_argument('--strategic_advantage', '-adv', action='store_true')
-<<<<<<< HEAD
     parser.add_argument('--use_deep_q_learning', '-deep_q', action="store_true")
-    parser.add_argument('--logdir', '-ld', type=str, default=os.path.join(CURR_DIR, 'runs'))
-=======
-    parser.add_argument('--online_q_learning', '-on', action="store_true")
     parser.add_argument('--logdir', '-ld', type=str, default=LOG_DIR)
->>>>>>> 67443ab07d974fd43ad34d8d2035e6cdd06757d3
     parser.add_argument('--experiment_name', '-exp', type=str, required=True)
     parser.add_argument('--model_save_freq', '-sf', type=int, default=5)
     parser.add_argument('--seed', '-s', type=int, default=1)
