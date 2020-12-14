@@ -67,6 +67,8 @@ if __name__ == '__main__':
     parser.add_argument('--cuda', '-c', action='store_true')
     parser.add_argument('--max_iters', '-it', type=int, default=10000)
     parser.add_argument('--lambda', '-lam', type=float, default=1.0)
+    parser.add_argument('--use_quad_net', '-quad', action='store_true')
+    parser.add_argument('--show_rnd', '-rnd', action='store_true')
 
     # Only pertinent for type=uncertainty
     parser.add_argument("--agent_checkpoints", '-cpts', nargs='+', type=str, default=LOG_DIR)
@@ -86,7 +88,10 @@ if __name__ == '__main__':
         scale = (0, A_strat_max)
     elif params['type'] == 'astrat_deep':
         env, data = load(env_load_loc), load(data_load_loc)
-        A_strat = train_q_network(env, data, gamma=0.95, lmbda=params['lambda'], use_cuda=params['cuda'], max_iters=params['max_iters'], dataset_size=params['dataset_size'])
+        A_strat, q_rnd = train_q_network(env, data, gamma=0.95, lmbda=params['lambda'], use_cuda=params['cuda'], max_iters=params['max_iters'], dataset_size=params['dataset_size'], use_quad_net=params['use_quad_net'], return_rnd=True)
+        if params['show_rnd']:
+            rnd_mat_vals = get_value_table_from_obs(env, q_rnd)
+            show_grid_gradient(env, rnd_mat_vals, scale=None)
         mat_vals = get_value_table_from_obs(env, A_strat)
         A_strat_max = env.good_goal_reward - env.bad_goal_reward
         scale = (0, A_strat_max)

@@ -88,18 +88,27 @@ class QuadQNet:
         else:
             self.dqn2.add_data(s, a, r, s_, a_, d)
 
-    def a_strat(self, s):
+    def q_rnd(self, s):
         s = torch.as_tensor(s[np.newaxis, :], dtype=torch.float32).to(self.device).permute(0, 3, 1, 2)
-        q_max = torch.max(self.dqn1.q_max(s), self.dqn2.q_max(s))
-        q_min = torch.min(self.dqn1.q_min(s), self.dqn2.q_min(s))
-        q_rnd = torch.max(torch.abs(self.dqn1.forward(s) - self.dqn2.forward(s)))
-        return (torch.clamp(q_max - q_min, min=self.eps) + self.lmbda * q_rnd).detach().cpu().item()
+        q_rnd = torch.mean(torch.pow(self.dqn1.forward(s) - self.dqn2.forward(s), 2))
+        return q_rnd.item()
+
+    def base_a_strat(self, s):
+        s = torch.as_tensor(s[np.newaxis, :], dtype=torch.float32).to(self.device).permute(0, 3, 1, 2)
+        q_max = torch.mean(torch.cat([self.dqn1.q_max(s).reshape(1), self.dqn2.q_max(s).reshape(1)]))
+        q_min = torch.mean(torch.cat([self.dqn1.q_min(s).reshape(1), self.dqn2.q_min(s).reshape(1)]))
+        return torch.clamp(q_max - q_min, min=self.eps).item()
+
+    def a_strat(self, s):
+        base_a_strat = self.base_a_strat(s)
+        q_rnd = self.q_rnd(s)
+        return base_a_strat + self.lmbda * q_rnd
 
     def train(self, num_iterations):
         return self.dqn1.train(num_iterations), self.dqn2.train(num_iterations)
    
 
-def train_q_network(env, expert_data_dict, max_iters=1e4, gamma=0.9, lmbda=1.0, itr_target_update=1, use_cuda=False, dataset_size=1000, use_quad_net=False):
+def train_q_network(env, expert_data_dict, max_iters=1e4, gamma=0.9, lmbda=1.0, itr_target_update=1e1, use_cuda=False, dataset_size=1000, use_quad_net=False, return_rnd=False):
     if use_quad_net:
         q_net = QuadQNet
     else:
@@ -118,4 +127,7 @@ def train_q_network(env, expert_data_dict, max_iters=1e4, gamma=0.9, lmbda=1.0, 
     print("Finished adding data")
     ddq_net.train(max_iters)
 
-    return ddq_net.a_strat
+    if return_rnd:
+        return ddq_net.a_strat, ddq_net.q_rnd
+    else:
+        return ddq_net.a_strat
