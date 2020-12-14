@@ -99,8 +99,12 @@ class QuadQNet:
         return self.dqn1.train(num_iterations), self.dqn2.train(num_iterations)
    
 
-def train_q_network(env, expert_data_dict, max_iters=1e4, gamma=0.9, lmbda=1.0, itr_target_update=1, use_cuda=False, dataset_size=1000):
-    ddq_net = DoubleQNet(env.observation_space.shape, env.action_space.n, gamma=gamma, lmbda=lmbda, itr_target_update=itr_target_update, device="cuda" if use_cuda else "cpu")
+def train_q_network(env, expert_data_dict, max_iters=1e4, gamma=0.9, lmbda=1.0, itr_target_update=1, use_cuda=False, dataset_size=1000, use_quad_net=False):
+    if use_quad_net:
+        q_net = QuadQNet
+    else:
+        q_net = DoubleQNet
+    ddq_net = q_net(env.observation_space.shape, env.action_space.n, gamma=gamma, lmbda=lmbda, itr_target_update=itr_target_update, device="cuda" if use_cuda else "cpu")
     states = expert_data_dict["states"][:dataset_size]
     actions = expert_data_dict["actions"][:dataset_size]
     rewards = expert_data_dict["rewards"][:dataset_size]

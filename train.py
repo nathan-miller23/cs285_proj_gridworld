@@ -232,7 +232,7 @@ def main(params):
     if params['strategic_advantage']:
         if params['use_deep_q_learning']:
             data = load(data_load_loc)
-            A_strat = train_q_network(env, data, gamma=params['gamma'], lmbda=params['lambda'], use_cuda=USE_CUDA, dataset_size=params['dataset_size'])
+            A_strat = train_q_network(env, data, gamma=params['gamma'], lmbda=params['lambda'], use_cuda=USE_CUDA, dataset_size=params['dataset_size'], use_quad_net=params["use_quad_net"])
         else:
             _, _, A_strat = tabular_learning(env, agent, gamma=params['gamma'])
 
@@ -268,6 +268,7 @@ if __name__ == '__main__':
     parser.add_argument('--gamma', '-gam', type=float, default=0.95)
     parser.add_argument('--rbg_observations', '-rbg', action='store_true')
     parser.add_argument('--calculate_empirical_action_probs', '-empi', action='store_true')
+    parser.add_argument('--use_quad_net', '-quad', action='store_true')
 
     params = vars(parser.parse_args())
     main(params)
