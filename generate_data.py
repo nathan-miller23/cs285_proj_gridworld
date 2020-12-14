@@ -70,6 +70,8 @@ def main():
     parser.add_argument('--save_agent', '-sa', action='store_true')
     parser.add_argument('--save_environment', '-se', action='store_true')
     parser.add_argument('--epsilon', '-eps', default=0.0, type=float)
+    parser.add_argument('--standard_epsilon', '-stdeps', default=0.0, type=float)
+    parser.add_argument('--critical_epsilon', '-criteps', default=0.0, type=float)
     parser.add_argument('--delta', '-dlt', default=0.0, type=float)
     parser.add_argument('--gamma', '-gm', default=1.0, type=float)
     parser.add_argument('--collect_rbg', '-rbg', action='store_true')
@@ -81,9 +83,18 @@ def main():
     env = FullyObsWrapper(base_env)
     env = ImgObsWrapper(env)
 
-    agent = TighRopeExpert(delta=args.delta, observation_space=env.observation_space, action_space=env.action_space, standard_epsilon=)
-                GoToGoodGoalAgent(epsilon=args.epsilon, delta=args.delta,
-                              observation_space=env.observation_space, action_space=env.action_space)
+    agent = None
+    if args.tightrope_env:
+        agent = TighRopeExpert(delta=args.delta, 
+                               observation_space=env.observation_space, 
+                               action_space=env.action_space, 
+                               standard_epsilon=args.standard_epsilon, 
+                               critical_epsilon=args.critical_epsilon)
+    else: 
+        agent = GoToGoodGoalAgent(epsilon=args.epsilon, 
+                                  delta=args.delta, 
+                                  observation_space=env.observation_space, 
+                                  action_space=env.action_space)
 
     if args.save_agent:
         agent_save_loc = os.path.join(args.outfile_dir, args.outfile_name, "agent.pkl")
