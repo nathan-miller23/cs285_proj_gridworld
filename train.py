@@ -212,8 +212,8 @@ def main(params):
     in_shape = env.observation_space.shape
     out_size = env.action_space.n
 
-    if X[0][0].shape != in_shape:
-        raise ValueError("Env observation space shape {} does not match data observation shape {}".format(in_shape, X[0][0].shape))
+    #if not X[0][0].shape != in_shape:
+    #    raise ValueError("Env observation space shape {} does not match data observation shape {}".format(in_shape, X[0][0].shape))
 
     params['in_shape'] = in_shape
     params['out_size'] = out_size
