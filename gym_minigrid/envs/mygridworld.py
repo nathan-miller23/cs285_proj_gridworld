@@ -47,6 +47,15 @@ class MyEnv(MyMiniGridEnv):
             return 0
         return self.dist_to_goal(s) - self.dist_to_goal(s_prime)
 
+    def get_empty_states(self):
+        return super().get_accessible_states()
+
+    def get_accessible_states(self):
+        empty_states = self.get_empty_states()
+        empty_states.append(self.good_goal_pos)
+        empty_states.append(self.bad_goal_pos)
+        return empty_states
+
 
     
 

@@ -12,6 +12,7 @@ class TightRopeEnv(MyMiniGridEnv):
         self.good_goal_reward = good_goal_reward
         self.bad_goal_reward = bad_goal_reward
         self.gamma = gamma
+        self.lava_states = []
         super().__init__(grid_size=size, max_steps=max_steps)
 
     def _gen_grid(self, width, height):
@@ -25,6 +26,7 @@ class TightRopeEnv(MyMiniGridEnv):
                     continue
                 elif abs(i - width // 2) == 1:
                     self.put_obj(BadGoal(), i, j)
+                    self.lava_states.append((i, j))
                 else:
                     self.put_obj(Wall(), i, j)
 
@@ -51,6 +53,16 @@ class TightRopeEnv(MyMiniGridEnv):
         if self.reward == 'sparse':
             return 0
         return self.dist_to_goal(s) - self.dist_to_goal(s_prime)
+
+    def get_empty_states(self):
+        return super().get_accessible_states()
+
+    def get_accessible_states(self):
+        empty_states = self.get_empty_states()
+        empty_states.append(self.good_goal_pos)
+        for state in self.lava_states:
+            empty_states.append(state)
+        return empty_states
 
 
 
