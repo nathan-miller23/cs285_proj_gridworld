@@ -1356,4 +1356,15 @@ class MyMiniGridEnv(MiniGridEnv):
     def _dense_reward(self, s, s_prime):
         raise NotImplementedError("Subclass must override this method!")
 
+    def get_empty_states(self):
+        empty_positions = []
+        for i in range(self.grid.width):
+            for j in range(self.grid.height):
+                if not self.grid.get(*(i, j)) or self.grid.get(*(i, j)).type == 'empty':
+                    empty_positions.append((i, j))
+        return empty_positions
+    
+    def get_accessible_states(self):
+        raise NotImplementedError("Subclass must override this method!")
+
     

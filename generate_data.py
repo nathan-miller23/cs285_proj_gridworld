@@ -2,8 +2,9 @@ import os, sys, argparse
 import numpy as np
 
 from gym_minigrid.envs.mygridworld import MyEnv
+from gym_minigrid.envs.tightrope import TightRopeEnv
 from gym_minigrid.wrappers import *
-from agents.hardcoded_agents import GoToGoodGoalAgent
+from agents.hardcoded_agents import GoToGoodGoalAgent, TighRopeExpert
 from utils import save, load, DATA_DIR
 
 def generate_data(env, agent, outfile, num_timesteps, collect_rbg, tile_size):
@@ -69,18 +70,31 @@ def main():
     parser.add_argument('--save_agent', '-sa', action='store_true')
     parser.add_argument('--save_environment', '-se', action='store_true')
     parser.add_argument('--epsilon', '-eps', default=0.0, type=float)
+    parser.add_argument('--standard_epsilon', '-stdeps', default=0.0, type=float)
+    parser.add_argument('--critical_epsilon', '-criteps', default=0.0, type=float)
     parser.add_argument('--delta', '-dlt', default=0.0, type=float)
     parser.add_argument('--gamma', '-gm', default=1.0, type=float)
     parser.add_argument('--collect_rbg', '-rbg', action='store_true')
     parser.add_argument('--tile_size', '-t', default=8, type=int)
+    parser.add_argument('--tightrope_env', '-tight', action='store_true')
     args = parser.parse_args()
 
-    base_env = MyEnv(size=9, good_goal_pos=(7, 8), bad_goal_pos=(8, 7), gamma=args.gamma)
+    base_env = TightRopeEnv(gamma=args.gamma) if args.tightrope_env else  MyEnv(good_goal_pos=(7, 8), bad_goal_pos=(8, 7), gamma=args.gamma)
     env = FullyObsWrapper(base_env)
     env = ImgObsWrapper(env)
 
-    agent = GoToGoodGoalAgent(epsilon=args.epsilon, delta=args.delta,
-                              observation_space=env.observation_space, action_space=env.action_space)
+    agent = None
+    if args.tightrope_env:
+        agent = TighRopeExpert(delta=args.delta, 
+                               observation_space=env.observation_space, 
+                               action_space=env.action_space, 
+                               standard_epsilon=args.standard_epsilon, 
+                               critical_epsilon=args.critical_epsilon)
+    else: 
+        agent = GoToGoodGoalAgent(epsilon=args.epsilon, 
+                                  delta=args.delta, 
+                                  observation_space=env.observation_space, 
+                                  action_space=env.action_space)
 
     if args.save_agent:
         agent_save_loc = os.path.join(args.outfile_dir, args.outfile_name, "agent.pkl")

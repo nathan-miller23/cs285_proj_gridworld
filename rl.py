@@ -28,7 +28,7 @@ def _value_iteration(env, agent, gamma=0.9, max_iters=1e4, max_tol=1e-4):
         q_func = _get_q_function(values_t, env, gamma, state_func=False)
 
         for state in values_t.keys():
-            if state == env.good_goal_pos or state == env.bad_goal_pos:
+            if (hasattr(env, 'good_goal_pos') and state == env.good_goal_pos) or (hasattr(env, 'bad_goal_pos') and state == env.bad_goal_pos):
                 continue
             obs = decode(state, env)
             action_probs = agent.action_probs(obs)
@@ -99,10 +99,9 @@ def decode(state, env):
 
 def get_initial_value_table(env):
     values = {}
-    for i in range(1, env.width - 1):
-        for j in range(1, env.height - 1):
-            values[(i, j)] = 0
-    values[env.good_goal_pos] = values[env.bad_goal_pos] = 0
+    all_states = env.get_accessible_states()
+    for state in all_states:
+        values[state] = 0
     return values
 
 
@@ -112,9 +111,7 @@ def get_value_table_from_obs(env, obs_func):
 
 
 def get_value_table_from_states(env, state_func):
-    states = list(get_initial_value_table(env).keys())
-    states.remove(env.good_goal_pos)
-    states.remove(env.bad_goal_pos)
+    states = env.get_empty_states()
     mat = np.zeros((env.width, env.height))
     for state in states:
         val = state_func(state)
@@ -142,9 +139,7 @@ if __name__ == '__main__':
 
     v_pi, q_pi, a_strat_pi = tabular_learning(env, agent, gamma=gamma)
 
-    states = list(get_initial_value_table(env).keys())
-    states.remove(env.good_goal_pos)
-    states.remove(env.bad_goal_pos)
+    states = env.get_empty_states()
 
     for state in states:
         expected = gamma ** (mannhattan_distance(state, env.good_goal_pos) - 1) * 10
