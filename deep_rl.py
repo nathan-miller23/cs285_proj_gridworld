@@ -3,10 +3,11 @@ from torch import nn, optim
 from agents.network import Net
 import numpy as np
 import torch, tqdm
+import random
 
 
 class DoubleQNet:
-    def __init__(self, state_dim, n_actions, gamma=0.99, lmbda=1.0, eps=1e-3, itr_target_update=1e1, device="cuda"): # TODO add ability to customize architecture
+    def __init__(self, state_dim, n_actions, gamma=0.99, lmbda=1.0, eps=1e-3, itr_target_update=1e1, device="cuda"):
         self.q_net = Net(state_dim, n_actions).to(device)
         self.q_net_opt = optim.Adam(self.q_net.parameters(), lr=0.001)
         self.target_q_net = Net(state_dim, n_actions).to(device)
@@ -21,15 +22,21 @@ class DoubleQNet:
         self.memory = ReplayBuffer(1e4, 64)
 
     def forward(self, x):
-        return self.q_net(x.permute(0, 3, 1, 2))
+        return self.q_net(x)
 
     def add_data(self, s, a, r, s_, a_, d):
         self.memory.add(s, a, r, s_, a_, d)
 
+    def q_max(self, s):
+        return torch.max(self.q_net(s).gather(1, torch.argmax(self.target_q_net(s), dim=1).unsqueeze(1)))
+
+    def q_min(self, s):
+        return torch.max(self.q_net(s).gather(1, torch.argmin(self.target_q_net(s), dim=1).unsqueeze(1)))
+
     def a_strat(self, s): 
         s = torch.as_tensor(s[np.newaxis, :], dtype=torch.float32).to(self.device).permute(0, 3, 1, 2)
-        q_max = torch.max(self.q_net(s).gather(1, torch.argmax(self.target_q_net(s), dim=1).unsqueeze(1)))
-        q_min = torch.max(self.q_net(s).gather(1, torch.argmin(self.target_q_net(s), dim=1).unsqueeze(1)))
+        q_max = self.q_max(s)
+        q_min = self.q_min(s)
         q_rnd = torch.max(torch.abs(self.q_net(s) - self.target_q_net(s)))
         return (torch.clamp(q_max - q_min, min=self.eps) + self.lmbda * q_rnd).detach().cpu().item()
 
@@ -65,6 +72,31 @@ class DoubleQNet:
             t.set_description("Q-Learning Loss {:.4f}".format(running_loss))
             losses.append(loss)
         return losses
+
+
+class QuadQNet:
+    def __init__(self, state_dim, n_actions, gamma=0.99, lmbda=1.0, eps=1e-3, itr_target_update=1e1, device="cuda"):
+        self.dqn1 = DoubleQNet(state_dim, n_actions, gamma, lmbda, eps, itr_target_update, device)
+        self.dqn2 = DoubleQNet(state_dim, n_actions, gamma, lmbda, eps, itr_target_update, device)
+        self.device = device
+        self.lmbda = lmbda
+        self.eps = eps
+
+    def add_data(self, s, a, r, s_, a_, d):
+        if random.randint(0, 1) == 0:
+            self.dqn1.add_data(s, a, r, s_, a_, d)
+        else:
+            self.dqn2.add_data(s, a, r, s_, a_, d)
+
+    def a_strat(self, s):
+        s = torch.as_tensor(s[np.newaxis, :], dtype=torch.float32).to(self.device).permute(0, 3, 1, 2)
+        q_max = torch.max(self.dqn1.q_max(s), self.dqn2.q_max(s))
+        q_min = torch.min(self.dqn1.q_min(s), self.dqn2.q_min(s))
+        q_rnd = torch.max(torch.abs(self.dqn1.forward(s) - self.dqn2.forward(s)))
+        return (torch.clamp(q_max - q_min, min=self.eps) + self.lmbda * q_rnd).detach().cpu().item()
+
+    def train(self, num_iterations):
+        return self.dqn1.train(num_iterations), self.dqn2.train(num_iterations)
    
 
 def train_q_network(env, expert_data_dict, max_iters=1e4, gamma=0.9, lmbda=1.0, itr_target_update=1, use_cuda=False, dataset_size=1000):
