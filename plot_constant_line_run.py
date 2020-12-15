@@ -29,6 +29,7 @@ if __name__ == '__main__':
     parser.add_argument('--probability_zero', '-p0', type=float, default=0.5)
     parser.add_argument('--probability_one', '-p1', type=float, default=0.5)
     parser.add_argument('--experiment_name', '-o', type=str, required=True)
+    parser.add_argument('--constant', '-c', type=float, default=None)
     args = parser.parse_args()
     logdir = os.path.join(LOG_DIR, args.experiment_name)
     writer = SummaryWriter(log_dir=logdir)
@@ -37,7 +38,7 @@ if __name__ == '__main__':
     #Loading data, env, agent
     print("starting logging")
     p0, p1 = args.probability_zero, args.probability_one
-    mean = 10*(p1 - p0) / (p1+p0)
+    mean = args.constant if args.constant else 10*(p1 - p0) / (p1+p0)
     print(mean)
     for i in range(maxepoch):
         writer.add_scalar("Reward/val_reward_mean", mean, i)
