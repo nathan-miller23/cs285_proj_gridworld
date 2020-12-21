@@ -130,4 +130,4 @@ def train_q_network(env, expert_data_dict, max_iters=1e4, gamma=0.9, lmbda=1.0, 
     if return_rnd:
         return ddq_net.a_strat, ddq_net.q_rnd
     else:
-        return ddq_net.a_strat
+        return ddq_net.a_strat, None
