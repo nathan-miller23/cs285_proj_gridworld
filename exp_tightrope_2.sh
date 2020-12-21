@@ -1,4 +1,4 @@
-for EPS in 0.0 0.001
+for EPS in 0.1 0.2
 do
     python generate_data.py --save_agent --save_environment -stdeps 0.4 -criteps $EPS --delta 0.3 -o "the_real_tightrope_$EPS" -n 5000 -tight
     python train.py -i "the_real_tightrope_$EPS" -c -e 300 -n 2500 -empi -exp "the_real_epoch_{300}_tightrop_eps_{$EPS}_SEED_{1}_n_{2500}"

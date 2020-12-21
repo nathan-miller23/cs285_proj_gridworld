@@ -26,7 +26,7 @@ def set_seed(seed):
     np.random.seed(seed)
     torch.manual_seed(seed)
 
-def load_data(data_path, dataset_size, rbg_observations, shuffle=False, calculate_empirical_action_probs=False):
+def load_data(data_path, dataset_size, rbg_observations, shuffle=False, calculate_empirical_action_probs=False, calculate_empirical_reward=False):
     with open(data_path, 'rb') as f:
         data_dict = pickle.load(f)
     N = len(data_dict['states'])
@@ -39,13 +39,17 @@ def load_data(data_path, dataset_size, rbg_observations, shuffle=False, calculat
     idx = idx[:dataset_size]
     states = data_dict['states'][idx]
     actions = data_dict['actions'][idx]
+    dones = data_dict['dones'][idx]
+    rewards = data_dict['rewards'][idx]
+
+    X = Y = action_probs = empi_reward = None
 
     if rbg_observations:
         rbg_observations = data_dict['states_rbg'][idx]
         X, Y = (rbg_observations, states), actions
     else:
         X, Y = (states,), actions
-
+    
     if calculate_empirical_action_probs:
         samples = (states, actions)
         pertinent_actions = [transition[1] for transition in zip(*samples) if encode(transition[0]) == (7, 7)]
@@ -56,9 +60,13 @@ def load_data(data_path, dataset_size, rbg_observations, shuffle=False, calculat
         for action_idx, count in c.items():
             action_counts[action_idx] = count
         action_probs = np.array(action_counts) / n
-        return X, Y, action_probs
-    else:
-        return X, Y, None
+
+    if calculate_empirical_reward:
+        total_reward = sum(rewards)
+        num_episodes = sum(dones)
+        empi_reward = total_reward / num_episodes
+    
+    return X, Y, action_probs, empi_reward
 
     
 
@@ -76,7 +84,7 @@ def strategic_advantage_weighted_cross_entropy(logits, labels, states, A_strat):
     return -torch.sum(losses) / torch.sum(weights)
 
 
-def train(model, X, Y, train_params, A_strat, env, probs=None):
+def train(model, X, Y, train_params, A_strat, env, probs=None, e_reward=None):
     weight_type = "a_strat" if A_strat else "vanilla"
     logdir = os.path.join(train_params['logdir'], "{}_{}_{}".format(weight_type, train_params['experiment_name'], datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")))
     writer = SummaryWriter(log_dir=logdir)
@@ -183,9 +191,10 @@ def train(model, X, Y, train_params, A_strat, env, probs=None):
         writer.add_scalar("Reward/val_reward_mean", val_reward_mean, epoch)
         writer.add_scalar("Reward/val_reward_std", val_reward_std, epoch)
 
-        if train_params['calculate_empirical_action_probs']:
+        if train_params['calculate_empirical_stats']:
             for i, prob in enumerate(probs):
                 writer.add_scalar("Policy/action_{}_empirical_prob".format(i), prob, epoch)
+            writer.add_scalar("Reward/val_reward_expected", e_reward, epoch)
 
         if epoch % train_params['model_save_freq'] == 0:
             torch.save((model.state_dict(), train_params), os.path.join(logdir, "checkpoint_{}".format(epoch)))
@@ -206,7 +215,7 @@ def main(params):
     rbg_env_load_loc = os.path.join(exp_data_dir, 'rbg_env.pkl')
 
     # Load our data
-    X, Y, probs = load_data(data_load_loc, params['dataset_size'], params['rbg_observations'], params['shuffle'], params['calculate_empirical_action_probs'])
+    X, Y, probs, e_reward = load_data(data_load_loc, params['dataset_size'], params['rbg_observations'], params['shuffle'], params['calculate_empirical_stats'], params['calculate_empirical_stats'])
     env = load(env_load_loc)
     agent = load(agent_load_loc)
     in_shape = env.observation_space.shape
@@ -239,7 +248,7 @@ def main(params):
     if params['rbg_observations']:
         env = load(rbg_env_load_loc)
 
-    train(model, X, Y, params, A_strat, env, probs)
+    train(model, X, Y, params, A_strat, env, probs, e_reward)
 
 
 if __name__ == '__main__':
@@ -267,9 +276,9 @@ if __name__ == '__main__':
     parser.add_argument('--lambda', '-lam', type=float, default=1.0)
     parser.add_argument('--gamma', '-gam', type=float, default=0.95)
     parser.add_argument('--rbg_observations', '-rbg', action='store_true')
-    parser.add_argument('--calculate_empirical_action_probs', '-empi', action='store_true')
+    parser.add_argument('--calculate_empirical_stats', '-empi', action='store_true')
     parser.add_argument('--use_quad_net', '-quad', action='store_true')
-    parser.add_argument('--q_learning_iterations', '-qiters', default=5000)
+    parser.add_argument('--q_learning_iterations', '-qiters', default=10000)
 
     params = vars(parser.parse_args())
     main(params)
