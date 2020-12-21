@@ -88,14 +88,14 @@ if __name__ == '__main__':
         scale = (0, A_strat_max)
     elif params['type'] == 'astrat_deep':
         env, data = load(env_load_loc), load(data_load_loc)
-        A_strat, q_rnd = train_q_network(env, data, gamma=0.95, lmbda=params['lambda'], use_cuda=params['cuda'], max_iters=params['max_iters'], dataset_size=params['dataset_size'], use_quad_net=params['use_quad_net'], return_rnd=True)
+        A_strat, q_rnd = train_q_network(env, data, gamma=0.95, lmbda=params['lambda'], use_cuda=params['cuda'], max_iters=params['max_iters'], dataset_size=params['dataset_size'], use_quad_net=params['use_quad_net'], return_rnd=params['show_rnd'])
         if params['show_rnd']:
             rnd_mat_vals = get_value_table_from_obs(env, q_rnd)
             show_grid_gradient(env, rnd_mat_vals, scale=None)
         mat_vals = get_value_table_from_obs(env, A_strat)
         A_strat_max = env.good_goal_reward - env.bad_goal_reward
         scale = (0, A_strat_max)
-    elif params['type'] == 'value':
+    elif params['type'] == 'values':
         env, agent = load(env_load_loc), load(agent_load_loc)
         v_pi, _, _ = tabular_learning(env, agent, gamma=0.95, state_func=True)
         mat_vals = get_value_table_from_states(env, v_pi)
