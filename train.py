@@ -205,6 +205,37 @@ def train(model, X, Y, train_params, A_strat, env, probs=None, e_reward=None):
 
 
 def main(params):
+    """Train an off-line deep RL pytorch agent
+
+    Params (dict):
+        data_dir (str): path to directory in which simulated data is stored. 
+        infile_name (str): Path to experiment sub-directory under the data_dir. Should be same as param used in generate_data.py
+        fc_arch (List(int)): List of hidden layer sizes in our Q-net
+        conv_arch (List(int)): List of number of conv filters in the CNN portion of our Q-net
+        num_epochs (int): Number of training epochs to run
+        batch_size (int): Batch size of supervised learning updates
+        learning_rate (float): Hopefully you know what this is
+        filter_size (int): CNN param. Same for all conv-layers
+        stride (int): CNN param. Same for all conv-layers
+        train_size (float): Proportion of dataset to be partitioned for training in train/test split
+        dataset_size (int): Number of timesteps to include in our full (train + test) dataset. Raises error if less than dataset_size
+            timesteps available
+        num_validation_episodes (int): Number of full rollouts to compute of the Q-agent when validating
+        strategic_advantage (bool): Whether to use strategic advantage weighting in our loss function
+        use_deep_q_learning (bool): Whether exact (tabular) q values or learned (Q-net) q values should be used when computing A_strat
+        logdir (str): Root directory of logging/agent/model serialization
+        experiment_name (str): subdirectory name for this particular trial
+        model_save_freq (int): How many epochs should we save a model checkpoint
+        seed (int): random seed
+        cuda (bool): Whether to use GPU acceleration
+        shuffle (bool): Whether dataset should be shuffled before training. Note this shuffling happens on all available data, not the first `dataset_size` points
+        lambda (float): Weighting for Random Network Distillation term in A_strat
+        gamma (float): Discount factor
+        rbg_observations (bool): Whether to use full RBG images, or gridworld observations
+        calculate_empirical_stats (bool): Whether simulated action probs + return should be calculated and logged
+        use_quad_net (bool): Whether to perform the double q trick for both Q_max and Q_min calculations. See deep_rl.py
+        q_learning_iterations (int): Number of SARSA iterations to perform (if use_deep_q_learning=True)
+    """
     set_seed(params['seed'])
 
     # Paths Parsing

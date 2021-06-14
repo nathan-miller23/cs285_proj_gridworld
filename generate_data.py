@@ -63,6 +63,43 @@ def generate_data(env, agent, outfile, num_timesteps, collect_rbg, tile_size):
     return data
 
 def main():
+    """Simulate an Agent in an environment and store trajectory data transitions + other metadata
+
+    Arguments:
+        num_timesteps (int): Number of (s,a,r,s') transitions to collect. Note that, because we collect at the trajectory level
+            not the timestep level, the actual number of timesteps collected could be slightly higher
+        outfile_name (str): sud-directory name for this particular data collection
+        outfile_dir (str): Root directory in which data will be stored
+        save_agent (bool): Whether to save a pickled copy of the agent that generated the data (could be used for on-policy RL)
+        save_environment (bool): Whether to save a pickled copy of the environment in which the data was generated (could be used for tabular RL)
+        epsilon (float): What percentage agent peforms random action (only used if tightrope_env=False)
+        standard_epsilon (float): Percentage of time agent performs random action when not on tightrope (only used if tightrope_env=True)
+        critical_epsilon (float): Percentage fo time agent performs random action when on tightrope (only used if tightrope_env=True)
+        delta (float): Percentage of time agent performs "STAY" action
+        gamma (float): Discount factor of environment
+        collect_rbg (bool): Whether we should collect RBG observations in addition to our standard gridworld observations
+        tile_size (int): Number of pixels per gridworld "space". Only relevant if collect_rbg=True
+        tightrope_env (bool): Whether to use TightRopeEnv (if True). Otherwise use standard good/bad goal environment
+
+    After running, the following directory structure should exist
+
+    /outfile_dir/
+        outfile_name/
+            data.pkl
+            agent.pkl (if save_agent=True)
+            env.pkl (if save_env=True)
+            rbg_env.pkl (if collect_rbg=True)
+
+    data.pickle is a dictionary of the following form:
+        "states" : np.array() shape (N, *obs_shape)
+        "actions" np.array shape (N, len(action_space))
+        "rewards" np.array shape (N,)
+        "next_states" np.array shape (N, *obs_shape)
+        "dones" np.array shape (N,)
+
+        "states_rbg" np.array shape (N, H, W, 3) (if collect_rbg=True, otherwise key doesn't exist)
+        "next_states_rbg" np.array shape (N, H, W, 3) (if collect_rbg=True, otherwise key doesn't exist)
+    """
     parser = argparse.ArgumentParser()
     parser.add_argument("--num_timesteps", "-n", default=10000, type=int)
     parser.add_argument("--outfile_name", "-o", default="out", type=str)

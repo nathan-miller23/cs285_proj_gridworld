@@ -3,7 +3,7 @@ from gym_minigrid.register import register
 
 class MyEnv(MyMiniGridEnv):
 
-    def __init__(self, size=9, max_steps=100, start_pos=(1, 1), good_goal_pos=None, bad_goal_pos=None, reward='sparse', good_goal_reward=10, bad_goal_reward=-10, gamma=1.0):
+    def __init__(self, size=9, max_steps=100, start_pos=(1, 1), good_goal_pos=(7, 8), bad_goal_pos=(8, 7), reward='sparse', good_goal_reward=10, bad_goal_reward=-10, gamma=1.0):
         self.start_pos = start_pos
         self.good_goal_pos = good_goal_pos
         self.bad_goal_pos = bad_goal_pos

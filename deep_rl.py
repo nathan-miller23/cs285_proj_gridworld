@@ -8,6 +8,17 @@ import random
 
 class DoubleQNet:
     def __init__(self, state_dim, n_actions, gamma=0.99, lmbda=1.0, eps=1e-3, itr_target_update=1e1, device="cuda"):
+        """Train a Q-net (using double Q trick) on (state, action, reward, state, action) pairs. This is thus on 'on policy' Q-net
+
+        Args:
+            state_dim (tuple): Shape of obseravtion input
+            n_actions (int): length of our discrete action spacce
+            gamma (float, optional): discount factor. Defaults to 0.99.
+            lmbda (float, optional): Random Network Distrillation weight in A_strat. Defaults to 1.0.
+            eps (float, optional): Min value for A_strat. To avoid potential divide-by-zero errors in training with A-strat weights. Defaults to 1e-3.
+            itr_target_update (int, optional): Number of SARSA updates after which we update the target network. Defaults to 1e1.
+            device (str, optional): Whether we use GPU or CPU. Defaults to "cuda".
+        """
         self.q_net = Net(state_dim, n_actions).to(device)
         self.q_net_opt = optim.Adam(self.q_net.parameters(), lr=0.001)
         self.target_q_net = Net(state_dim, n_actions).to(device)
@@ -76,6 +87,8 @@ class DoubleQNet:
 
 class QuadQNet:
     def __init__(self, state_dim, n_actions, gamma=0.99, lmbda=1.0, eps=1e-3, itr_target_update=1e1, device="cuda"):
+        """Train two "independent" DoubleQNets so that our RND estimate is less biased
+        """
         self.dqn1 = DoubleQNet(state_dim, n_actions, gamma, lmbda, eps, itr_target_update, device)
         self.dqn2 = DoubleQNet(state_dim, n_actions, gamma, lmbda, eps, itr_target_update, device)
         self.device = device
